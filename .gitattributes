@@ -1,0 +1,36 @@
+*.cpp text
+*.hpp text
+*.h text
+*.c text
+
+*.sh text eol=lf
+*.py text eol=lf
+
+*.md text
+*.txt text
+*.rst text
+
+*.json text
+*.xml text
+*.yml text
+*.yaml text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.tga binary
+
+*.so binary
+*.dll binary
+*.exe binary
+*.dylib binary
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.po text
+
+* text=auto eol=lf
