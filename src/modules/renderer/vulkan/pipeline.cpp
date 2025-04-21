@@ -700,9 +700,9 @@ void pipeline::createGraphicsPipeline() {
     dynamicState.pDynamicStates = dynamicStates.data();
 
     VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstantData);
+    pushConstantRange.size = 128;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -854,17 +854,19 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     for (const auto& mesh : meshes) {
         PushConstantData pushData{};
         pushData.model = mesh.transform.getModelMatrix();
+        pushData.material = ConvertMaterial(mesh.material);
+
         vkCmdPushConstants(
             commandBuffer,
             pipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
             sizeof(PushConstantData),
             &pushData
         );
 
-        MaterialUniform matUniform = ConvertMaterial(mesh.material);
-        updateMaterialUniformBuffer(currentFrame, matUniform);
+        /*MaterialUniform matUniform = ConvertMaterial(mesh.material);
+        updateMaterialUniformBuffer(currentFrame, matUniform);*/
 
         vkCmdDrawIndexed(commandBuffer, mesh.indexCount, 1, mesh.indexOffset, mesh.vertexOffset, 0);
     }
@@ -880,7 +882,6 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
         LOG_CRITICAL("Failed to record command buffer");
     }
 }
-
 
 void pipeline::createSyncObjects()
 {
