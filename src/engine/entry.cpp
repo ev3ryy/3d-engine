@@ -1,6 +1,7 @@
 #include "entry.h"
 
 #include "ui/debug/ui.h"
+#include "scene/world/world.h"
 
 #include <imgui.h>
 #include <vulkan/imgui_impl_glfw.h>
@@ -41,15 +42,21 @@ entry::~entry() {
 }
 
 void entry::mainLoop() {
+    _world = std::make_unique<world>();
+
     bool flag = false;;
 
     ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     _pipeline->imClearColor = clearColor;
 
+    static auto lastTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+
     while (!glfwWindowShouldClose(window::_window)) {
-        static auto lastTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+        lastTime = std::chrono::high_resolution_clock::now();
+        currentTime = std::chrono::high_resolution_clock::now();
+        deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
 
         input::update();
@@ -91,6 +98,8 @@ void entry::mainLoop() {
             float dummyX, dummyY;
             input::getMouseDelta(dummyX, dummyY);
         }
+
+        _world->update(deltaTime);
 
         int fb_width, fb_height;
         glfwGetFramebufferSize(window::_window, &fb_width, &fb_height);

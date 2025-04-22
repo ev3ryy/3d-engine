@@ -5,8 +5,10 @@ class core;
 class renderer;
 class pipeline;
 class camera;
+class world;
 
 #include <string>
+#include <memory>
 
 struct config {
     bool mainWindow;
@@ -26,6 +28,8 @@ private:
     core* _core;
     renderer* _renderer;
     pipeline* _pipeline;
+
+    std::unique_ptr<world> _world;
 
     int last_fb_width = 0, last_fb_height = 0;
 };
