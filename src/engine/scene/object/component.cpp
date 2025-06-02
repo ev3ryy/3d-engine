@@ -1,11 +1,16 @@
 #include "component.h"
 
-void component::setOwner(object* obj)
+component::component()
+{
+	canUpdate = true;
+}
+
+void component::setOwner(Object* obj)
 {
 	owner = obj;
 }
 
-object* component::getOwner() const
+Object* component::getOwner() const
 {
 	return owner;
 }

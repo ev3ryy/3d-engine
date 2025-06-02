@@ -3,11 +3,15 @@
 
 class window;
 class pipeline;
+class World;
 
 class renderer {
 public:
 	renderer();
 	~renderer();
+
+	void render(const World& world);
+	void waitDeviceIdle() const;
 
 	pipeline* getPipeline() const { return _pipeline; }
 

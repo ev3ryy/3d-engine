@@ -1,20 +1,26 @@
 #include "object.h"
 
-object::object(const std::string& name)
+int Object::nextID;
+
+Object::Object(const std::string& name)
 {
 	id = nextID++;
 	transform = addComponent<transformComponent>();
+
+	canUpdate = true;
 }
 
-object::~object()
+Object::~Object()
 {
 
 }
 
-void object::update(float deltaTime)
+void Object::update(float deltaTime)
 {
 	for (const auto& component : components) {
-		component->update(deltaTime);
+		if (component->canUpdate) {
+			component->update(deltaTime);
+		}
 	}
 
 	//for (const auto& component : children) {
@@ -22,12 +28,12 @@ void object::update(float deltaTime)
 	//}
 }
 
-const std::string& object::getName() const
+const std::string& Object::getName() const
 {
 	return name;
 }
 
-int object::getID() const
+int Object::getID() const
 {
 	return id;
 }

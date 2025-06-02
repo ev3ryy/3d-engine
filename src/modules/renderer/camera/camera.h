@@ -5,42 +5,49 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
-enum class Camera_Movement {
+enum class CameraMovement {
     FORWARD,
     BACKWARD,
     LEFT,
     RIGHT
 };
 
-class camera {
+struct RenderCameraState {
+    glm::mat4 view;
+    glm::mat4 proj;
+    uint32_t viewportWidth;
+    uint32_t viewportHeight;
+};
+
+class Camera {
 public:
-    camera(glm::vec3 startPosition = glm::vec3(0.0f, 0.0f, 3.0f),
+    Camera(glm::vec3 startPosition = glm::vec3(0.0f, 0.0f, 3.0f),
         glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
         float yaw = -90.0f,
         float pitch = 0.0f)
         : position(startPosition), worldUp(up), yaw(yaw), pitch(pitch),
-        movementSpeed(2.5f), mouseSensitivity(0.1f)
+        movementSpeed(2.5f), mouseSensitivity(0.1f), fov(60.0f)
     {
         updateCameraVectors();
     }
 
-    glm::mat4 GetViewMatrix() const {
+    glm::mat4 getViewMatrix() const {
         return glm::lookAt(position, position + front, up);
     }
 
-    void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
+    void processKeyboard(CameraMovement direction, float deltaTime) {
         float velocity = movementSpeed * deltaTime;
-        if (direction == Camera_Movement::FORWARD)
+        if (direction == CameraMovement::FORWARD)
             position += front * velocity;
-        if (direction == Camera_Movement::BACKWARD)
+        if (direction == CameraMovement::BACKWARD)
             position -= front * velocity;
-        if (direction == Camera_Movement::LEFT)
+        if (direction == CameraMovement::LEFT)
             position -= right * velocity;
-        if (direction == Camera_Movement::RIGHT)
+        if (direction == CameraMovement::RIGHT)
             position += right * velocity;
     }
 
-    void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
+    void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
         if (std::abs(xoffset) < 0.0001f && std::abs(yoffset) < 0.0001f)
             return;
 
@@ -59,7 +66,7 @@ public:
         updateCameraVectors();
     }
 
-    void SetSpeed(float value) {
+    void setSpeed(float value) {
         if (value < 0.0f)
             movementSpeed = 0.0f;
         else if (value > 20.0f)
@@ -79,6 +86,8 @@ public:
 
     float movementSpeed;
     float mouseSensitivity;
+
+    float fov;
 
 private:
     void updateCameraVectors() {

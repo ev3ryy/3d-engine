@@ -7,7 +7,6 @@ layout(binding = 0) uniform UniformBufferObject {
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    // Add material data here to match the C++ struct and pass through
     vec4 u_DiffuseColor;
     float u_AmbientFactor;
     vec3 pad;

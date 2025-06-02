@@ -8,6 +8,16 @@
 #include <renderer.h>
 #include <vulkan/pipeline.h>
 
+#include "object/component.h"
+#include "object/components/transform_component.h"
+#include "object/components/mesh_renderer_component.h"
+
+#include "mesh/mesh.h"
+#include "material/material.h"
+
+#include "object/object.h"
+#include "world/world.h"
+
 #include <mesh/primitives/primitives.h>
 
 #include <spdlog/spdlog.h>
@@ -62,10 +72,10 @@ namespace ui {
             ImGui::OpenPopup("Primitive Popup");
         }
 
-        if (ImGui::BeginPopup("Primitive Popup")) {
+        /*if (ImGui::BeginPopup("Primitive Popup")) {
             if (ImGui::Selectable("Cube")) {
                 auto [vertices, indices] = primitives::createCube();
-                mesh newMesh(vertices, indices);
+                Mesh newMesh(vertices, indices);
                 size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
                 newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
                 size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
@@ -77,7 +87,7 @@ namespace ui {
             }
             if (ImGui::Selectable("Pyramid")) {
                 auto [vertices, indices] = primitives::createPyramid();
-                mesh newMesh(vertices, indices);
+                Mesh newMesh(vertices, indices);
                 size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
                 newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
                 size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
@@ -88,7 +98,7 @@ namespace ui {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
-        }
+        }*/
 
         ImGui::Text("Number of Meshes: %zu", _pipeline.meshes.size());
         ImGui::Text("Selected Mesh: %d", selectedMesh);
@@ -111,51 +121,51 @@ namespace ui {
 
         ImGui::End();
         
-        if (selectedMesh >= 0 && selectedMesh < static_cast<int>(_pipeline.meshes.size())) {
-            ImGui::SetNextWindowPos(ImVec2(400, 100), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Mesh Settings");
+        //if (selectedMesh >= 0 && selectedMesh < static_cast<int>(_pipeline.meshes.size())) {
+        //    ImGui::SetNextWindowPos(ImVec2(400, 100), ImGuiCond_FirstUseEver);
+        //    ImGui::Begin("Mesh Settings");
 
-            mesh& selected = _pipeline.meshes[selectedMesh];
-            ImGui::Text("Edit Mesh %d Transform", selectedMesh);
-            float pos[3] = { selected.transform.translation.x, selected.transform.translation.y, selected.transform.translation.z };
-            if (ImGui::DragFloat3("Position", pos, 0.1f)) {
-                selected.transform.translation = glm::vec3(pos[0], pos[1], pos[2]);
-            }
-            float rot[3] = { selected.transform.rotation.x, selected.transform.rotation.y, selected.transform.rotation.z };
-            if (ImGui::DragFloat3("Rotation", rot, 0.5f)) {
-                selected.transform.rotation = glm::vec3(rot[0], rot[1], rot[2]);
-            }
-            float scale[3] = { selected.transform.scale.x, selected.transform.scale.y, selected.transform.scale.z };
-            if (ImGui::DragFloat3("Scale", scale, 0.1f)) {
-                selected.transform.scale = glm::vec3(scale[0], scale[1], scale[2]);
-            }
+        //    Mesh& selected = _pipeline.meshes[selectedMesh];
+        //    ImGui::Text("Edit Mesh %d Transform", selectedMesh);
+        //    float pos[3] = { selected.transform.translation.x, selected.transform.translation.y, selected.transform.translation.z };
+        //    if (ImGui::DragFloat3("Position", pos, 0.1f)) {
+        //        selected.transform.translation = glm::vec3(pos[0], pos[1], pos[2]);
+        //    }
+        //    float rot[3] = { selected.transform.rotation.x, selected.transform.rotation.y, selected.transform.rotation.z };
+        //    if (ImGui::DragFloat3("Rotation", rot, 0.5f)) {
+        //        selected.transform.rotation = glm::vec3(rot[0], rot[1], rot[2]);
+        //    }
+        //    float scale[3] = { selected.transform.scale.x, selected.transform.scale.y, selected.transform.scale.z };
+        //    if (ImGui::DragFloat3("Scale", scale, 0.1f)) {
+        //        selected.transform.scale = glm::vec3(scale[0], scale[1], scale[2]);
+        //    }
 
-            ImGui::Separator();
-            ImGui::Text("Material Settings");
+        //    ImGui::Separator();
+        //    ImGui::Text("Material Settings");
 
-            // Diffuse Color
-            {
-                float diffuse[3] = { selected.material.diffuseColor.r,
-                                     selected.material.diffuseColor.g,
-                                     selected.material.diffuseColor.b };
-                if (ImGui::ColorEdit3("Diffuse Color", diffuse)) {
-                    selected.material.diffuseColor = glm::vec3(diffuse[0], diffuse[1], diffuse[2]);
-                }
-            }
+        //    // Diffuse Color
+        //    {
+        //        float diffuse[3] = { selected.material.diffuseColor.r,
+        //                             selected.material.diffuseColor.g,
+        //                             selected.material.diffuseColor.b };
+        //        if (ImGui::ColorEdit3("Diffuse Color", diffuse)) {
+        //            selected.material.diffuseColor = glm::vec3(diffuse[0], diffuse[1], diffuse[2]);
+        //        }
+        //    }
 
-            {
-                if (ImGui::DragFloat("Ambient Factor", &selected.material.ambientFactor, 0.01f, 0.0f, 5.0f)) {
-                    // already
-                }
-            }
-
-
-            if (ImGui::Button("Reset Material")) {
-                selected.material.diffuseColor = glm::vec3(1.0f);
-            }
+        //    {
+        //        if (ImGui::DragFloat("Ambient Factor", &selected.material.ambientFactor, 0.01f, 0.0f, 5.0f)) {
+        //            // already
+        //        }
+        //    }
 
 
-            ImGui::End();
-        }
+        //    if (ImGui::Button("Reset Material")) {
+        //        selected.material.diffuseColor = glm::vec3(1.0f);
+        //    }
+
+
+        //    ImGui::End();
+        //}
 	}
 }

@@ -87,12 +87,13 @@ struct UniformBufferObject {
     float sunLightIntensity;
 };
 
-class mesh {
+class Mesh {
 public:
-    mesh(const std::vector<vertex>& vertices, const std::vector<uint32_t>& indices)
+    Mesh(const std::vector<vertex>& vertices, const std::vector<uint32_t>& indices)
         : vertices_(vertices), indices_(indices), indexCount(static_cast<uint32_t>(indices.size()))
     {
     }
+    ~Mesh() {};
 
     const std::vector<vertex>& getVertices() const { return vertices_; }
     const std::vector<uint32_t>& getIndices() const { return indices_; }
@@ -104,13 +105,11 @@ public:
         return vertex::getAttributeDescriptions();
     }
 
-    Transform transform;
-
     uint32_t vertexOffset = 0;
     uint32_t indexOffset = 0;
-    uint32_t indexCount = 0;
 
-    Material material;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
 
 private:
     std::vector<vertex> vertices_;

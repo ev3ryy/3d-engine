@@ -2,32 +2,55 @@
 #define SCENE_WORLD_H
 
 #include <vector>
+#include <unordered_map>
+
+#include <camera/camera.h>
 
 #include "../object/object.h"
 
-class world {
+class MeshRendererComponent;
+
+class World {
 public:
-	world();
-	~world() = default;
+	World();
+	~World() = default;
 
-	void addObject(std::unique_ptr<object> obj);
+	void addObject(std::unique_ptr<Object> obj);
 
-	template<typename T = object, typename... Args>
+	template<typename T = Object, typename... Args>
 	T* createObject(const std::string& name = "New Object", Args&&... args) {
 		static_assert(std::is_base_of<Object, T>::value, "T must derive from object");
 		std::unique_ptr<T> newObj = std::make_unique<T>(name, std::forward<Args>(args)...);
 		T* ptr = newObj.get();
-		objects.push_back(newObj);
+
+		objectIdMap[ptr->getID()] = ptr;
+		objectNameMap[ptr->getName()] = ptr;
+
+		objects.push_back(std::move(newObj));
 		return ptr;
 	}
 
-	const std::vector<std::unique_ptr<object>>& getAllObjects() const;
+	const std::vector<std::unique_ptr<Object>>& getAllObjects() const;
+
+	Object* findObjectByID(int id);
+	Object* findObjectByName(std::string& name);
+	const Camera& getActiveRenderCamera() const;
+
+	void setActiveRenderCamera(const Camera* cam);
+
+	std::vector<Object*> getRenderableObjects() const;
 
 	void update(float deltaTime);
 	void clear();
 
 private:
-	std::vector<std::unique_ptr<object>> objects;
+	std::vector<std::unique_ptr<Object>> objects;
+
+	// fast access
+	std::unordered_map<int, Object*> objectIdMap;
+	std::unordered_map<std::string, Object*> objectNameMap;
+
+	const Camera* activeRenderCamera = nullptr;
 };
 
 #endif // SCENE_WORLD_H

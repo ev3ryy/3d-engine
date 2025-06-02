@@ -5,7 +5,7 @@ class core;
 class renderer;
 class pipeline;
 class camera;
-class world;
+class World;
 
 #include <string>
 #include <memory>
@@ -15,10 +15,10 @@ struct config {
     std::string projectPath;
 };
 
-class entry {
+class Engine {
 public:
-    entry(core* coreInstance, renderer* rendererInstance);
-    ~entry();
+    Engine(core* coreInstance, renderer* rendererInstance);
+    ~Engine();
 
     void mainLoop();
 
@@ -27,9 +27,8 @@ public:
 private:
     core* _core;
     renderer* _renderer;
-    pipeline* _pipeline;
 
-    std::unique_ptr<world> _world;
+    std::unique_ptr<World> world;
 
     int last_fb_width = 0, last_fb_height = 0;
 };

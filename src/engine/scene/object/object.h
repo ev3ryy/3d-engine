@@ -7,12 +7,13 @@
 
 #include "component.h"
 #include "components/transform_component.h"
+#include "components/mesh_renderer_component.h"
 #include <logger.h>
 
-class object {
+class Object {
 public:
-	object(const std::string& name = "New Object");
-	~object();
+	Object(const std::string& name = "New Object");
+	~Object();
 
 	template<typename T, typename... Args>
 	T* addComponent(Args&&... args) {
@@ -56,7 +57,7 @@ public:
 		return nullptr;
 	}
 
-	void update(float deltaTime);
+	virtual void update(float deltaTime);
 	
 	const std::string& getName() const;
 	int getID() const;
@@ -70,13 +71,14 @@ public:
 	}
 
 	static int nextID;
+	bool canUpdate;
 
 private:
 	std::string name;
 	int id;
 
-	object* parent = nullptr;
-	std::vector<object*> children;
+	Object* parent = nullptr;
+	std::vector<Object*> children;
 
 	std::vector<std::unique_ptr<component>> components;
 	transformComponent* transform = nullptr;

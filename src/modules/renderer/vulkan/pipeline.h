@@ -32,6 +32,27 @@ struct PushConstantData {
     MaterialUniform material;
 };
 
+struct RenderItem {
+    glm::mat4 modelMatrix;
+    MaterialUniform material;
+    uint32_t indexCount;
+    uint32_t indexOffset;
+    uint32_t vertexOffset;
+};
+
+struct RenderFrameData {
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
+    VkDescriptorSet globalDescriptorSet = VK_NULL_HANDLE;
+    std::vector<RenderItem> renderItems;
+
+    uint32_t viewportWidth;
+    uint32_t viewportHeight;
+
+    ImVec4 clearColor;
+    ImDrawData* imguiDrawData = nullptr;
+};
+
 class pipeline {
 public:
     pipeline();
@@ -39,17 +60,26 @@ public:
 
     void drawFrame();
 
-    void addInstance(mesh* meshPtr, const Transform& transform);
+    void addInstance(Mesh* meshPtr, const Transform& transform);
 
-    VkInstance          getInstance() const { return instance; }
-    VkPhysicalDevice    getPhysicalDevice() const { return physicalDevice; }
-    VkDevice            getDevice() const { return device; }
-    VkQueue             getGraphicsQueue() const { return graphicsQueue; }
-    uint32_t            getQueueFamily() const { return queueFamily; }
-    VkRenderPass        getRenderPass() const { return renderPass; }
-    VkDescriptorPool    getDescriptorPool() const { return descriptorPool; }
-    uint32_t            getMinImageCount() const { return _swapchain->minImageCount; }
-    uint32_t            getImageCount() const { return _swapchain->imageCount; }
+    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData);
+
+    VkInstance                      getInstance() const { return instance; }
+    VkPhysicalDevice                getPhysicalDevice() const { return physicalDevice; }
+    VkDevice                        getDevice() const { return device; }
+    VkQueue                         getGraphicsQueue() const { return graphicsQueue; }
+    VkQueue                         getPresentQueue() const { return presentQueue; }
+    uint32_t                        getQueueFamily() const { return queueFamily; }
+    VkRenderPass                    getRenderPass() const { return renderPass; }
+    VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
+    uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
+    uint32_t                        getImageCount() const { return _swapchain->imageCount; }
+    uint32_t                        getCurrentFrame() const { return currentFrame; }
+    VkImageView                     getDepthImageView() const { return depthImageView; };
+    std::vector<VkDescriptorSet>    getDescriptorSets() const { return descriptorSets; }
+
+    void                            setCurrentFrame(uint32_t currentFrame) { currentFrame = currentFrame; }
     
     swapchain* getSwapchain() const { return _swapchain; }
 
@@ -58,12 +88,18 @@ public:
 
     bool vsync = false;
 
-    camera _camera;
+    Camera _camera;
 
     ImVec4 imClearColor;
 
-    std::vector<mesh> meshes;
-    std::unordered_map<mesh*, InstanceGroup> instanceGroups;
+    std::vector<Mesh> meshes;
+    std::unordered_map<Mesh*, InstanceGroup> instanceGroups;
+
+    std::vector<VkFence> inFlightFences;
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+
+    std::vector<VkCommandBuffer> commandBuffers;
 
 private:
 	void init();
@@ -88,19 +124,14 @@ private:
 
     void createCommandPool();
     void createCommandBuffer();
-
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void createSyncObjects();
 
     void createDescriptorPool();
-    //void createVertexBuffer(const std::vector<mesh>& meshes);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    //void createIndexBuffer();
     void createDescriptorSetLayout();
     void createUniformBuffers();
-    void updateUniformBuffer(uint32_t currentImage);
     void createMaterialUniformBuffers();
     void updateMaterialUniformBuffer(uint32_t currentImage, const MaterialUniform& materialData);
     void createDescriptorSets();
@@ -118,11 +149,7 @@ private:
     VkPipeline graphicsPipeline;
 
     VkCommandPool commandPool;
-    std::vector<VkCommandBuffer> commandBuffers;
 
-    std::vector<VkSemaphore> imageAvailableSemaphores;
-    std::vector<VkSemaphore> renderFinishedSemaphores;
-    std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
     uint32_t queueFamily = 0;

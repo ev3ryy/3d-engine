@@ -239,11 +239,11 @@ void pipeline::createDescriptorSetLayout()
     bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     // Binding 1: material
-    bindings[1].binding = 1;
-    bindings[1].descriptorCount = 1;
-    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    bindings[1].pImmutableSamplers = nullptr;
-    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    //bindings[1].binding = 1;
+    //bindings[1].descriptorCount = 1;
+    //bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    //bindings[1].pImmutableSamplers = nullptr;
+    //bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -270,13 +270,10 @@ void pipeline::createUniformBuffers()
     }
 }
 
-void pipeline::updateUniformBuffer(uint32_t currentImage) {
+void pipeline::updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj) {
     UniformBufferObject ubo{};
-    ubo.view = _camera.GetViewMatrix();
-    ubo.proj = glm::perspective(glm::radians(45.0f),
-        _swapchain->swapChainExtent.width / static_cast<float>(_swapchain->swapChainExtent.height),
-        0.1f, 1000.0f);
-    ubo.proj[1][1] *= -1;
+    ubo.view = view;
+    ubo.proj = proj;
 
     ubo.sunLightDirection = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
     ubo.sunLightIntensity = 2.0f;
@@ -284,8 +281,9 @@ void pipeline::updateUniformBuffer(uint32_t currentImage) {
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
+// delete this
 void pipeline::createMaterialUniformBuffers() {
-    VkDeviceSize bufferSize = sizeof(MaterialUniform);
+   /* VkDeviceSize bufferSize = sizeof(MaterialUniform);
 
     materialUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     materialUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -299,11 +297,12 @@ void pipeline::createMaterialUniformBuffers() {
             materialUniformBuffersMemory[i]);
 
         vkMapMemory(device, materialUniformBuffersMemory[i], 0, bufferSize, 0, &materialUniformBuffersMapped[i]);
-    }
+    }*/
 }
 
+// delete this
 void pipeline::updateMaterialUniformBuffer(uint32_t currentImage, const MaterialUniform& materialData) {
-    memcpy(materialUniformBuffersMapped[currentImage], &materialData, sizeof(MaterialUniform));
+    /*memcpy(materialUniformBuffersMapped[currentImage], &materialData, sizeof(MaterialUniform));*/
 }
 
 void pipeline::createDescriptorSets() {
@@ -325,12 +324,12 @@ void pipeline::createDescriptorSets() {
         uboBufferInfo.offset = 0;
         uboBufferInfo.range = sizeof(UniformBufferObject);
 
-        VkDescriptorBufferInfo materialBufferInfo{};
-        materialBufferInfo.buffer = materialUniformBuffers[i];
-        materialBufferInfo.offset = 0;
-        materialBufferInfo.range = sizeof(MaterialUniform);
+        //VkDescriptorBufferInfo materialBufferInfo{};
+        //materialBufferInfo.buffer = materialUniformBuffers[i];
+        //materialBufferInfo.offset = 0;
+        //materialBufferInfo.range = sizeof(MaterialUniform);
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
 
         // binding 0: global UBO
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -342,13 +341,13 @@ void pipeline::createDescriptorSets() {
         descriptorWrites[0].pBufferInfo = &uboBufferInfo;
 
         // binding 1: material
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = &materialBufferInfo;
+        //descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        //descriptorWrites[1].dstSet = descriptorSets[i];
+        //descriptorWrites[1].dstBinding = 1;
+        //descriptorWrites[1].dstArrayElement = 0;
+        //descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //descriptorWrites[1].descriptorCount = 1;
+        //descriptorWrites[1].pBufferInfo = &materialBufferInfo;
 
         vkUpdateDescriptorSets(device,
             static_cast<uint32_t>(descriptorWrites.size()),
@@ -790,99 +789,6 @@ void pipeline::createCommandBuffer()
     }
 }
 
-void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        LOG_CRITICAL("Failed to begin recording command buffer");
-    }
-
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = _swapchain->getSwapchainFramebuffer(imageIndex);
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = _swapchain->swapChainExtent;
-
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color.float32[0] = imClearColor.x;
-    clearValues[0].color.float32[1] = imClearColor.y;
-    clearValues[0].color.float32[2] = imClearColor.z;
-    clearValues[0].color.float32[3] = imClearColor.w;
-    clearValues[1].depthStencil.depth = 1.0f;
-    clearValues[1].depthStencil.stencil = 0;
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(_swapchain->swapChainExtent.width);
-    viewport.height = static_cast<float>(_swapchain->swapChainExtent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = _swapchain->swapChainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    VkBuffer vertexBuffer = _vertexBuffer->getVertexBuffer();
-    VkDeviceSize offsets = 0;
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &offsets);
-    vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-    updateUniformBuffer(currentFrame);
-
-    VkDescriptorSet currentDescriptorSet = descriptorSets[currentFrame];
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipelineLayout,
-        0,
-        1,
-        &currentDescriptorSet,
-        0,
-        nullptr
-    );
-
-    for (const auto& mesh : meshes) {
-        PushConstantData pushData{};
-        pushData.model = mesh.transform.getModelMatrix();
-        pushData.material = ConvertMaterial(mesh.material);
-
-        vkCmdPushConstants(
-            commandBuffer,
-            pipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            0,
-            sizeof(PushConstantData),
-            &pushData
-        );
-
-        /*MaterialUniform matUniform = ConvertMaterial(mesh.material);
-        updateMaterialUniformBuffer(currentFrame, matUniform);*/
-
-        vkCmdDrawIndexed(commandBuffer, mesh.indexCount, 1, mesh.indexOffset, mesh.vertexOffset, 0);
-    }
-
-    ImDrawData* draw_data = ImGui::GetDrawData();
-    if (draw_data && draw_data->TotalVtxCount > 0) {
-        ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
-    }
-
-    vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        LOG_CRITICAL("Failed to record command buffer");
-    }
-}
-
 void pipeline::createSyncObjects()
 {
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -906,9 +812,125 @@ void pipeline::createSyncObjects()
     }
 }
 
+void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        LOG_CRITICAL("Failed to begin recording command buffer");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = _swapchain->getSwapchainFramebuffer(imageIndex);
+    renderPassInfo.renderArea.offset = { 0, 0 };
+    renderPassInfo.renderArea.extent = { renderData.viewportWidth, renderData.viewportHeight };
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color.float32[0] = renderData.clearColor.x;
+    clearValues[0].color.float32[1] = renderData.clearColor.y;
+    clearValues[0].color.float32[2] = renderData.clearColor.z;
+    clearValues[0].color.float32[3] = renderData.clearColor.w;
+    clearValues[1].depthStencil.depth = 1.0f;
+    clearValues[1].depthStencil.stencil = 0;
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(renderData.viewportWidth);
+    viewport.height = static_cast<float>(renderData.viewportHeight);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = { renderData.viewportWidth, renderData.viewportHeight };
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    VkBuffer vertexBuffer = _vertexBuffer->getVertexBuffer();
+    VkDeviceSize offsets = 0;
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &offsets);
+    vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+    //updateUniformBuffer(currentFrame, renderData.viewMatrix, renderData.projMatrix);
+
+    /*VkDescriptorSet currentDescriptorSet = descriptorSets[currentFrame];
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipelineLayout,
+        0,
+        1,
+        &currentDescriptorSet,
+        0,
+        nullptr
+    );*/
+
+    VkDescriptorSet globalDescriptorSet = renderData.globalDescriptorSet;
+    if (globalDescriptorSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelineLayout,
+            0,
+            1,
+            &globalDescriptorSet,
+            0,
+            nullptr
+        );
+    }
+    else {
+        LOG_WARN("Global descriptor set is null or not provided!");
+    }
+
+    for (const auto& item : renderData.renderItems) {
+        if (item.indexCount == 0 || item.indexOffset == (uint32_t)-1 || item.vertexOffset == (uint32_t)-1) {
+            LOG_WARN("Skipping render item with invalid mesh data.");
+            continue;
+        }
+
+        PushConstantData pushData{};
+        pushData.model = item.modelMatrix;
+        pushData.material = item.material;
+
+        vkCmdPushConstants(
+            commandBuffer,
+            pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(PushConstantData),
+            &pushData
+        );
+
+        /*MaterialUniform matUniform = ConvertMaterial(mesh.material);
+        updateMaterialUniformBuffer(currentFrame, matUniform);*/
+
+        vkCmdDrawIndexed(commandBuffer, item.indexCount, 1, item.indexOffset, item.vertexOffset, 0);
+    }
+
+    ImDrawData* draw_data = ImGui::GetDrawData();
+    if (draw_data && draw_data->TotalVtxCount > 0) {
+        ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        LOG_CRITICAL("Failed to record command buffer");
+    }
+}
+
+// delete this
 void pipeline::drawFrame()
 {
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    /*vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, _swapchain->swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -966,5 +988,5 @@ void pipeline::drawFrame()
         LOG_CRITICAL("failed to present swap chain image");
     }
 
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;*/
 }
