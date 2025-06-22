@@ -18,7 +18,7 @@ class mesh;
 struct vertex {
     glm::vec3 pos;
     glm::vec3 normal;
-    glm::vec3 texCoord;
+    glm::vec2 texCoord;
 
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};

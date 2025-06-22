@@ -1,11 +1,7 @@
 #include "world.h"
 
-#include "../object/test_object.h"
-#include "../object/components/test_component.h"
-
 World::World()
 {
-	testObject* obj = createObject<testObject>();
 }
 
 void World::addObject(std::unique_ptr<Object> obj)
@@ -50,6 +46,12 @@ const Camera& World::getActiveRenderCamera() const
 
 void World::setActiveRenderCamera(const Camera* cam)
 {
+	if (!cam) {
+		LOG_ERROR("setActiveRenderCamera doesn`t have cam pointer");
+		return;
+	}
+	
+	activeRenderCamera = cam;
 }
 
 std::vector<Object*> World::getRenderableObjects() const

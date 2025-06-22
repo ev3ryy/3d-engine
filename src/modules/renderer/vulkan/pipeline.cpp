@@ -50,7 +50,6 @@ void pipeline::init() {
     _indexBuffer = new buffers::indexBuffer(device, graphicsQueue, commandPool, allocator);
 
     createUniformBuffers();
-    createMaterialUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createCommandBuffer();
@@ -87,10 +86,10 @@ void pipeline::cleanup()
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
     }
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device, materialUniformBuffers[i], nullptr);
-        vkFreeMemory(device, materialUniformBuffersMemory[i], nullptr);
-    }
+    //for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    //    vkDestroyBuffer(device, materialUniformBuffers[i], nullptr);
+    //    vkFreeMemory(device, materialUniformBuffersMemory[i], nullptr);
+    //}
 
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -229,7 +228,7 @@ void pipeline::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
 
 void pipeline::createDescriptorSetLayout()
 {
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings{};
 
     // Binding 0: global UBO
     bindings[0].binding = 0;
@@ -237,13 +236,6 @@ void pipeline::createDescriptorSetLayout()
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[0].pImmutableSamplers = nullptr;
     bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    // Binding 1: material
-    //bindings[1].binding = 1;
-    //bindings[1].descriptorCount = 1;
-    //bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    //bindings[1].pImmutableSamplers = nullptr;
-    //bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -281,30 +273,6 @@ void pipeline::updateUniformBuffer(uint32_t currentImage, const glm::mat4& view,
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
-// delete this
-void pipeline::createMaterialUniformBuffers() {
-   /* VkDeviceSize bufferSize = sizeof(MaterialUniform);
-
-    materialUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    materialUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    materialUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        createBuffer(bufferSize,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            materialUniformBuffers[i],
-            materialUniformBuffersMemory[i]);
-
-        vkMapMemory(device, materialUniformBuffersMemory[i], 0, bufferSize, 0, &materialUniformBuffersMapped[i]);
-    }*/
-}
-
-// delete this
-void pipeline::updateMaterialUniformBuffer(uint32_t currentImage, const MaterialUniform& materialData) {
-    /*memcpy(materialUniformBuffersMapped[currentImage], &materialData, sizeof(MaterialUniform));*/
-}
-
 void pipeline::createDescriptorSets() {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
@@ -324,11 +292,6 @@ void pipeline::createDescriptorSets() {
         uboBufferInfo.offset = 0;
         uboBufferInfo.range = sizeof(UniformBufferObject);
 
-        //VkDescriptorBufferInfo materialBufferInfo{};
-        //materialBufferInfo.buffer = materialUniformBuffers[i];
-        //materialBufferInfo.offset = 0;
-        //materialBufferInfo.range = sizeof(MaterialUniform);
-
         std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
 
         // binding 0: global UBO
@@ -339,15 +302,6 @@ void pipeline::createDescriptorSets() {
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &uboBufferInfo;
-
-        // binding 1: material
-        //descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        //descriptorWrites[1].dstSet = descriptorSets[i];
-        //descriptorWrites[1].dstBinding = 1;
-        //descriptorWrites[1].dstArrayElement = 0;
-        //descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        //descriptorWrites[1].descriptorCount = 1;
-        //descriptorWrites[1].pBufferInfo = &materialBufferInfo;
 
         vkUpdateDescriptorSets(device,
             static_cast<uint32_t>(descriptorWrites.size()),
@@ -859,20 +813,6 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &offsets);
     vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-    //updateUniformBuffer(currentFrame, renderData.viewMatrix, renderData.projMatrix);
-
-    /*VkDescriptorSet currentDescriptorSet = descriptorSets[currentFrame];
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipelineLayout,
-        0,
-        1,
-        &currentDescriptorSet,
-        0,
-        nullptr
-    );*/
-
     VkDescriptorSet globalDescriptorSet = renderData.globalDescriptorSet;
     if (globalDescriptorSet != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(
@@ -896,6 +836,9 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
             continue;
         }
 
+        //LOG_INFO("DrawIndexed: indexCount={%d}, indexOffset={%d}, vertexOffset={%d}",
+        //    item.indexCount, item.indexOffset, item.vertexOffset);
+
         PushConstantData pushData{};
         pushData.model = item.modelMatrix;
         pushData.material = item.material;
@@ -904,16 +847,14 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
             commandBuffer,
             pipelineLayout,
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            0,
-            sizeof(PushConstantData),
+            0, // offset
+            sizeof(PushConstantData), // size
             &pushData
         );
 
-        /*MaterialUniform matUniform = ConvertMaterial(mesh.material);
-        updateMaterialUniformBuffer(currentFrame, matUniform);*/
-
         vkCmdDrawIndexed(commandBuffer, item.indexCount, 1, item.indexOffset, item.vertexOffset, 0);
     }
+
 
     ImDrawData* draw_data = ImGui::GetDrawData();
     if (draw_data && draw_data->TotalVtxCount > 0) {
@@ -925,68 +866,4 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to record command buffer");
     }
-}
-
-// delete this
-void pipeline::drawFrame()
-{
-    /*vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, _swapchain->swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        _swapchain->recreateSwapChain(renderPass, depthImageView);
-        return;
-    }
-    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        LOG_CRITICAL("failed to acquire swap chain image");
-    }
-
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
-
-    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
-        LOG_CRITICAL("failed to submit draw command buffer");
-    }
-
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = { _swapchain->swapChain };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-
-    result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window::framebufferResized) {
-        window::framebufferResized = false;
-        _swapchain->recreateSwapChain(renderPass, depthImageView);
-    }
-    else if (result != VK_SUCCESS) {
-        LOG_CRITICAL("failed to present swap chain image");
-    }
-
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;*/
 }

@@ -4,10 +4,10 @@ project(MyEngine)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_MAKE_PROGRAM "C:/Program Files/ninja/ninja.exe")
-set(CMAKE_GENERATOR "Ninja")
+# set(CMAKE_MAKE_PROGRAM "C:/Program Files/ninja/ninja.exe")
+# set(CMAKE_GENERATOR "Ninja")
 
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
+#set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
 add_compile_options(/utf-8)
 
@@ -38,6 +38,7 @@ target_include_directories(imgui PUBLIC
     "${CMAKE_SOURCE_DIR}/include/imgui"
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan"
     "${CMAKE_SOURCE_DIR}/include/glfw/include"
+    "${CMAKE_SOURCE_DIR}/include/glm"
     ${Vulkan_INCLUDE_DIRS}
 )
 

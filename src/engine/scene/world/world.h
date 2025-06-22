@@ -4,7 +4,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include <camera/camera.h>
+#include "../camera/camera.h"
 
 #include "../object/object.h"
 
@@ -14,6 +14,12 @@ class World {
 public:
 	World();
 	~World() = default;
+
+	World(const World&) = delete;
+	World& operator=(const World&) = delete;
+
+	World(World&&) = default;
+	World& operator=(World&&) = default;
 
 	void addObject(std::unique_ptr<Object> obj);
 

@@ -21,7 +21,6 @@
 #include "mesh/mesh.h"
 
 #include "window/window.h"
-#include "camera/camera.h"
 
 #include <imgui.h>
 
@@ -58,10 +57,6 @@ public:
     pipeline();
 	~pipeline();
 
-    void drawFrame();
-
-    void addInstance(Mesh* meshPtr, const Transform& transform);
-
     void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData);
 
@@ -87,8 +82,6 @@ public:
     buffers::indexBuffer* getIndexBuffer() const { return _indexBuffer; }
 
     bool vsync = false;
-
-    Camera _camera;
 
     ImVec4 imClearColor;
 
@@ -132,8 +125,6 @@ private:
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void createDescriptorSetLayout();
     void createUniformBuffers();
-    void createMaterialUniformBuffers();
-    void updateMaterialUniformBuffer(uint32_t currentImage, const MaterialUniform& materialData);
     void createDescriptorSets();
 
     VkInstance instance;

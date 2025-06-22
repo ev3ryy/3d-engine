@@ -2,6 +2,7 @@
 
 #include "ui/debug/ui.h"
 #include "scene/world/world.h"
+#include "scene/object/components/camera_component.h"
 
 #include <imgui.h>
 #include <vulkan/imgui_impl_glfw.h>
@@ -37,7 +38,16 @@ Engine::~Engine() {
 
 void Engine::mainLoop() {
     world = std::make_unique<World>();
-    world->setActiveRenderCamera(&_renderer->getPipeline()->_camera);
+
+    auto cameraObj = world->createObject("MainCamera");
+    auto cameraComp = cameraObj->addComponent<CameraComponent>(
+        glm::vec3(0.0f, 0.0f, 3.0f), // position
+        glm::vec3(0.0f, 1.0f, 0.0f), // up
+        -90.0f,                      // yaw
+        0.0f                         // pitch
+    );
+
+    world->setActiveRenderCamera(&cameraComp->camera);
 
     bool flag = false;;
 
@@ -48,52 +58,12 @@ void Engine::mainLoop() {
     float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
 
     while (!glfwWindowShouldClose(window::_window)) {
-        lastTime = std::chrono::high_resolution_clock::now();
-        currentTime = std::chrono::high_resolution_clock::now();
-        deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
 
         input::update();
         glfwPollEvents();
-
-        bool cameraControlActive = (glfwGetMouseButton(window::_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-
-        // move this to camera component or etc
-
-        //if (cameraControlActive) {
-        //    glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-        //    bool shiftDown = input::IsKeyDown(keycode::LShift);
-
-        //    float speedMultiplier = shiftDown ? 2.0f : 1.0f;
-        //    float adjustedDeltaTime = deltaTime * speedMultiplier;
-
-        //    if (input::IsKeyDown(keycode::W))
-        //        _pipeline->_camera.ProcessKeyboard(CameraMovement::FORWARD, adjustedDeltaTime);
-        //    if (input::IsKeyDown(keycode::S))
-        //        _pipeline->_camera.ProcessKeyboard(CameraMovement::BACKWARD, adjustedDeltaTime);
-        //    if (input::IsKeyDown(keycode::A))
-        //        _pipeline->_camera.ProcessKeyboard(CameraMovement::LEFT, adjustedDeltaTime);
-        //    if (input::IsKeyDown(keycode::D))
-        //        _pipeline->_camera.ProcessKeyboard(CameraMovement::RIGHT, adjustedDeltaTime);
-
-        //    float xoffset, yoffset;
-        //    input::getMouseDelta(xoffset, yoffset);
-        //    if (xoffset != 0.0f || yoffset != 0.0f)
-        //        _pipeline->_camera.ProcessMouseMovement(xoffset, yoffset);
-
-        //    float scrollX, scrollY;
-        //    input::getScrollDelta(scrollX, scrollY);
-        //    if (scrollY != 0.0f) {
-        //        const float speedSensitivity = 0.1f; // Коэффициент изменения скорости
-        //        _pipeline->_camera.SetSpeed(_pipeline->_camera.movementSpeed + scrollY * speedSensitivity);
-        //    }
-        //}
-        //else {
-        //    glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        //    float dummyX, dummyY;
-        //    input::getMouseDelta(dummyX, dummyY);
-        //}
 
         world->update(deltaTime);
 
@@ -117,7 +87,7 @@ void Engine::mainLoop() {
         PerformanceStats stats = window::updatePerfomanceStats();
 
         if (_config.mainWindow) {
-            ui::debug::drawDebugMenu(*_renderer->getPipeline());
+            ui::debug::drawDebugMenu(*world.get(), *_renderer);
         }
 
         ImGui::Render();
@@ -125,7 +95,6 @@ void Engine::mainLoop() {
     }
 
     _renderer->waitDeviceIdle();
-    //vkDeviceWaitIdle(_pipeline->getDevice());
 }
 
 int main() {
@@ -140,13 +109,6 @@ int main() {
     Engine::_config.mainWindow = true;
 
     input::init(window::_window);
-
-    _renderer->getPipeline()->_camera = Camera(
-        glm::vec3(0.0f, 0.0f, 3.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        -90.0f,
-        0.0f
-    );
 
     engine->mainLoop();
 

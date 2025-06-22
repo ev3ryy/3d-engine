@@ -11,6 +11,7 @@
 #include "object/component.h"
 #include "object/components/transform_component.h"
 #include "object/components/mesh_renderer_component.h"
+#include "object/components/camera_component.h"
 
 #include "mesh/mesh.h"
 #include "material/material.h"
@@ -60,112 +61,102 @@ namespace ui {
 		ImGui_ImplVulkan_Init(&initInfo);
 	}
 
-	void debug::drawDebugMenu(pipeline& _pipeline)
-	{
-        static int selectedMesh = -1;
-        static bool showPrimitivePopup = true;
-        static int selectedPrimitive = -1;
+    void debug::drawDebugMenu(World& world, renderer& renderer)
+    {
+        static Object* selectedObject = nullptr;
 
-        ImGui::Begin("Debug Layout");
+        ImGui::Begin("Scene Hierarchy");
 
-        if (ImGui::Button("Select Primitive")) {
+        if (ImGui::Button("Create Primitive")) {
             ImGui::OpenPopup("Primitive Popup");
         }
 
-        /*if (ImGui::BeginPopup("Primitive Popup")) {
-            if (ImGui::Selectable("Cube")) {
-                auto [vertices, indices] = primitives::createCube();
-                Mesh newMesh(vertices, indices);
-                size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
-                newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
-                newMesh.indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                newMesh.indexCount = static_cast<uint32_t>(indices.size());
-                newMesh.transform.translation = glm::vec3(0.0f, 0.0f, -5.0f);
-                _pipeline.meshes.push_back(newMesh);
+        if (ImGui::BeginPopup("Primitive Popup")) {
+            auto createPrimitive = [&](const std::string& name, const auto& primitiveGenerator) {
+                auto newObject = world.createObject(name);
+                auto [vertices, indices] = primitiveGenerator();
+
+                auto pipeline = renderer.getPipeline();
+                size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(vertices);
+                size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(indices);
+
+                auto mesh = std::make_shared<Mesh>(vertices, indices);
+                mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
+                mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
+                mesh->indexCount = static_cast<uint32_t>(indices.size());
+                mesh->vertexCount = static_cast<uint32_t>(vertices.size());
+
+                auto material = std::make_shared<Material>(); 
+
+                newObject->addComponent<MeshRendererComponent>(mesh, material);
+
                 ImGui::CloseCurrentPopup();
+                };
+
+            if (ImGui::Selectable("Cube")) {
+                createPrimitive("Cube", primitives::createCube);
             }
             if (ImGui::Selectable("Pyramid")) {
-                auto [vertices, indices] = primitives::createPyramid();
-                Mesh newMesh(vertices, indices);
-                size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
-                newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
-                newMesh.indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                newMesh.indexCount = static_cast<uint32_t>(indices.size());
-                newMesh.transform.translation = glm::vec3(0.0f, 0.0f, -5.0f);
-                _pipeline.meshes.push_back(newMesh);
-                ImGui::CloseCurrentPopup();
+                createPrimitive("Pyramid", primitives::createPyramid);
             }
+
             ImGui::EndPopup();
-        }*/
-
-        ImGui::Text("Number of Meshes: %zu", _pipeline.meshes.size());
-        ImGui::Text("Selected Mesh: %d", selectedMesh);
-
-        ImGui::Separator();
-        ImGui::Text("Meshes in Scene:");
-        static int selectedMeshLocal = -1;
-        for (size_t i = 0; i < _pipeline.meshes.size(); ++i) {
-            char label[32];
-            sprintf(label, "Mesh %zu", i);
-            if (ImGui::Selectable(label, selectedMeshLocal == static_cast<int>(i))) {
-                selectedMeshLocal = static_cast<int>(i);
-                selectedMesh = selectedMeshLocal;
-            }
         }
 
         ImGui::Separator();
-        ImGui::Text("Environment Settings");
-        static float sunDir[3] = { 1.0f, 1.0f, -1.0f };
+        ImGui::Text("Objects in Scene:");
+
+        const auto& allObjects = world.getAllObjects();
+        for (const auto& objPtr : allObjects) {
+            Object* currentObject = objPtr.get();
+
+            if (currentObject->getComponent<CameraComponent>() != nullptr) {
+                continue;
+            }
+
+            char label[64];
+            snprintf(label, sizeof(label), "%s (ID: %d)", currentObject->getName().c_str(), currentObject->getID());
+
+            if (ImGui::Selectable(label, selectedObject == currentObject)) {
+                selectedObject = currentObject;
+            }
+        }
 
         ImGui::End();
-        
-        //if (selectedMesh >= 0 && selectedMesh < static_cast<int>(_pipeline.meshes.size())) {
-        //    ImGui::SetNextWindowPos(ImVec2(400, 100), ImGuiCond_FirstUseEver);
-        //    ImGui::Begin("Mesh Settings");
 
-        //    Mesh& selected = _pipeline.meshes[selectedMesh];
-        //    ImGui::Text("Edit Mesh %d Transform", selectedMesh);
-        //    float pos[3] = { selected.transform.translation.x, selected.transform.translation.y, selected.transform.translation.z };
-        //    if (ImGui::DragFloat3("Position", pos, 0.1f)) {
-        //        selected.transform.translation = glm::vec3(pos[0], pos[1], pos[2]);
-        //    }
-        //    float rot[3] = { selected.transform.rotation.x, selected.transform.rotation.y, selected.transform.rotation.z };
-        //    if (ImGui::DragFloat3("Rotation", rot, 0.5f)) {
-        //        selected.transform.rotation = glm::vec3(rot[0], rot[1], rot[2]);
-        //    }
-        //    float scale[3] = { selected.transform.scale.x, selected.transform.scale.y, selected.transform.scale.z };
-        //    if (ImGui::DragFloat3("Scale", scale, 0.1f)) {
-        //        selected.transform.scale = glm::vec3(scale[0], scale[1], scale[2]);
-        //    }
+        if (selectedObject) {
+            ImGui::Begin("Inspector");
 
-        //    ImGui::Separator();
-        //    ImGui::Text("Material Settings");
+            ImGui::Text("Editing: %s", selectedObject->getName().c_str());
+            ImGui::Separator();
 
-        //    // Diffuse Color
-        //    {
-        //        float diffuse[3] = { selected.material.diffuseColor.r,
-        //                             selected.material.diffuseColor.g,
-        //                             selected.material.diffuseColor.b };
-        //        if (ImGui::ColorEdit3("Diffuse Color", diffuse)) {
-        //            selected.material.diffuseColor = glm::vec3(diffuse[0], diffuse[1], diffuse[2]);
-        //        }
-        //    }
+            if (transformComponent* transform = selectedObject->getComponent<transformComponent>()) {
+                ImGui::Text("Transform");
+                ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+                ImGui::DragFloat3("Rotation", &transform->rotation.x, 0.5f);
+                ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
+            }
+            else {
+                ImGui::Text("Object has no Transform Component.");
+            }
 
-        //    {
-        //        if (ImGui::DragFloat("Ambient Factor", &selected.material.ambientFactor, 0.01f, 0.0f, 5.0f)) {
-        //            // already
-        //        }
-        //    }
+            ImGui::Separator();
 
+            if (MeshRendererComponent* meshRenderer = selectedObject->getComponent<MeshRendererComponent>()) {
+                if (std::shared_ptr<Material> material = meshRenderer->getMaterial()) {
+                    ImGui::Text("Material");
+                    ImGui::ColorEdit3("Diffuse Color", &material->diffuseColor.r);
+                    ImGui::DragFloat("Ambient Factor", &material->ambientFactor, 0.01f, 0.0f, 5.0f);
+                }
+                else {
+                    ImGui::Text("Object has no Material.");
+                }
+            }
+            else {
+                ImGui::Text("Object has no Mesh Renderer Component.");
+            }
 
-        //    if (ImGui::Button("Reset Material")) {
-        //        selected.material.diffuseColor = glm::vec3(1.0f);
-        //    }
-
-
-        //    ImGui::End();
-        //}
-	}
+            ImGui::End();
+        }
+    }
 }

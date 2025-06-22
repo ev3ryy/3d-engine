@@ -100,18 +100,19 @@ void renderer::render(const World& world)
 
 		Mesh* mesh = meshPtr.get();
 		Material* material = materialPtr.get();
+		MaterialUniform matUniform = ConvertMaterial(*material);
 
 		RenderItem renderItem{};
 		renderItem.modelMatrix = transform->getWorldMatrix();
-		//renderItem.material = material;
+		renderItem.material = matUniform;
 		renderItem.indexCount = mesh->indexCount;
 		renderItem.indexOffset = mesh->indexOffset;
-		renderItem.vertexOffset = mesh->vertexCount;
+		renderItem.vertexOffset = mesh->vertexOffset;
 
 		renderData.renderItems.push_back(renderItem);
 	}
 
-	ImVec4 clearColor = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
+	ImVec4 clearColor = ImVec4(0.23f, 0.22f, 0.22f, 1.00f);
 
 	VkExtent2D swapchainExtent = _pipeline->getSwapchain()->swapChainExtent;
 	renderData.viewportWidth = swapchainExtent.width;

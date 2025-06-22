@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <cstdint>
 
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "mesh/mesh.h"
 
