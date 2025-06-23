@@ -1,3 +1,6 @@
 [submodule "include/VulkanMemoryAllocator"]
 	path = include/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "include/assimp"]
+	path = include/assimp
+	url = https://github.com/assimp/assimp.git

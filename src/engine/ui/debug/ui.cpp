@@ -19,6 +19,8 @@
 #include "object/object.h"
 #include "world/world.h"
 
+#include "../../resources/manager/resource_manager.h"
+
 #include <mesh/primitives/primitives.h>
 
 #include <spdlog/spdlog.h>
@@ -61,8 +63,7 @@ namespace ui {
 		ImGui_ImplVulkan_Init(&initInfo);
 	}
 
-    void debug::drawDebugMenu(World& world, renderer& renderer)
-    {
+    Object* drawSceneHierarchy(World& world, renderer& renderer) {
         static Object* selectedObject = nullptr;
 
         ImGui::Begin("Scene Hierarchy");
@@ -86,7 +87,7 @@ namespace ui {
                 mesh->indexCount = static_cast<uint32_t>(indices.size());
                 mesh->vertexCount = static_cast<uint32_t>(vertices.size());
 
-                auto material = std::make_shared<Material>(); 
+                auto material = std::make_shared<Material>();
 
                 newObject->addComponent<MeshRendererComponent>(mesh, material);
 
@@ -109,7 +110,6 @@ namespace ui {
         const auto& allObjects = world.getAllObjects();
         for (const auto& objPtr : allObjects) {
             Object* currentObject = objPtr.get();
-
             if (currentObject->getComponent<CameraComponent>() != nullptr) {
                 continue;
             }
@@ -123,40 +123,130 @@ namespace ui {
         }
 
         ImGui::End();
+        return selectedObject;
+    }
 
-        if (selectedObject) {
-            ImGui::Begin("Inspector");
+    void drawInspector(Object* selectedObject) {
+        if (!selectedObject) return;
 
-            ImGui::Text("Editing: %s", selectedObject->getName().c_str());
-            ImGui::Separator();
+        ImGui::Begin("Inspector");
 
-            if (transformComponent* transform = selectedObject->getComponent<transformComponent>()) {
-                ImGui::Text("Transform");
-                ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
-                ImGui::DragFloat3("Rotation", &transform->rotation.x, 0.5f);
-                ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
-            }
-            else {
-                ImGui::Text("Object has no Transform Component.");
-            }
+        // ... ваш код инспектора остается без изменений ...
+        ImGui::Text("Editing: %s", selectedObject->getName().c_str());
+        ImGui::Separator();
 
-            ImGui::Separator();
-
-            if (MeshRendererComponent* meshRenderer = selectedObject->getComponent<MeshRendererComponent>()) {
-                if (std::shared_ptr<Material> material = meshRenderer->getMaterial()) {
-                    ImGui::Text("Material");
-                    ImGui::ColorEdit3("Diffuse Color", &material->diffuseColor.r);
-                    ImGui::DragFloat("Ambient Factor", &material->ambientFactor, 0.01f, 0.0f, 5.0f);
-                }
-                else {
-                    ImGui::Text("Object has no Material.");
-                }
-            }
-            else {
-                ImGui::Text("Object has no Mesh Renderer Component.");
-            }
-
-            ImGui::End();
+        if (transformComponent* transform = selectedObject->getComponent<transformComponent>()) {
+            ImGui::Text("Transform");
+            ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+            ImGui::DragFloat3("Rotation", &transform->rotation.x, 0.5f);
+            ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
         }
+        else {
+            ImGui::Text("Object has no Transform Component.");
+        }
+
+        ImGui::Separator();
+
+        if (MeshRendererComponent* meshRenderer = selectedObject->getComponent<MeshRendererComponent>()) {
+            if (std::shared_ptr<Material> material = meshRenderer->getMaterial()) {
+                ImGui::Text("Material");
+                ImGui::ColorEdit3("Diffuse Color", &material->diffuseColor.r);
+                ImGui::DragFloat("Ambient Factor", &material->ambientFactor, 0.01f, 0.0f, 5.0f);
+            }
+            else {
+                ImGui::Text("Object has no Material.");
+            }
+        }
+        else {
+            ImGui::Text("Object has no Mesh Renderer Component.");
+        }
+
+        ImGui::End();
+    }
+
+    void drawAssetBrowser(World& world, renderer& renderer) {
+        static char modelPathBuffer[256] = "assets/models/sponza/sponza.obj"; // Путь по умолчанию
+        static std::string selectedMeshID;
+
+        ImGui::Begin("Asset Browser");
+
+        // --- Секция загрузки ---
+        ImGui::Text("Load New Model");
+        ImGui::InputText("##ModelPath", modelPathBuffer, sizeof(modelPathBuffer));
+        ImGui::SameLine();
+        if (ImGui::Button("Load")) {
+            ResourceManager::Get().LoadModel(modelPathBuffer);
+        }
+        ImGui::Separator();
+
+        // --- Секция отображения ресурсов ---
+        if (ImGui::CollapsingHeader("Meshes")) {
+            for (const auto& [id, mesh] : ResourceManager::Get().GetAllMeshes()) {
+                if (ImGui::Selectable(id.c_str(), selectedMeshID == id)) {
+                    selectedMeshID = id;
+                }
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Materials")) {
+            for (const auto& [id, material] : ResourceManager::Get().GetAllMaterials()) {
+                ImGui::Text(id.c_str());
+            }
+        }
+
+        ImGui::Separator();
+
+        // --- Секция спавна объекта ---
+        if (!selectedMeshID.empty()) {
+            ImGui::Text("Selected: %s", selectedMeshID.c_str());
+            if (ImGui::Button("Spawn in World")) {
+
+                // Получаем "шаблон" меша из менеджера
+                std::shared_ptr<Mesh> meshTemplate = ResourceManager::Get().GetMesh(selectedMeshID);
+                if (meshTemplate) {
+                    // Проверяем, был ли этот меш уже загружен на GPU.
+                    // Мы используем vertexCount как флаг. Если он 0, значит меш еще только на CPU.
+                    if (meshTemplate->vertexCount == 0) {
+                        LOG_INFO("First time spawning mesh '%s'. Uploading to GPU...", selectedMeshID.c_str());
+
+                        // ЭТОТ КОД АНАЛОГИЧЕН ВАШЕМУ КОДУ СОЗДАНИЯ ПРИМИТИВОВ
+                        auto pipeline = renderer.getPipeline();
+                        size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(meshTemplate->getVertices());
+                        size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(meshTemplate->getIndices());
+
+                        // Обновляем данные прямо в меше, который хранится в ResourceManager.
+                        // Теперь все последующие спавны этого меша будут использовать уже готовые оффсеты.
+                        meshTemplate->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
+                        meshTemplate->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
+                        meshTemplate->vertexCount = static_cast<uint32_t>(meshTemplate->getVertices().size());
+                        meshTemplate->indexCount = static_cast<uint32_t>(meshTemplate->getIndices().size());
+                    }
+
+                    // Получаем материал, используя ID, который мы сохранили в меше
+                    std::shared_ptr<Material> material = nullptr;//ResourceManager::Get().GetMaterial(meshTemplate->materialId_);
+                    if (!material) {
+                        // Если материала нет, создаем и регистрируем материал по умолчанию
+                        material = std::make_shared<Material>();
+                        material->name = "Default Material";
+                        //ResourceManager::Get().RegisterMaterial("default", material);
+                    }
+
+                    // Создаем объект в мире
+                    auto newObject = world.createObject(selectedMeshID);
+                    newObject->addComponent<MeshRendererComponent>(meshTemplate, material);
+                    // TransformComponent, скорее всего, добавляется в createObject, если нет - добавьте
+                    newObject->addComponent<transformComponent>();
+                }
+            }
+        }
+
+        ImGui::End();
+    }
+
+    void debug::drawDebugMenu(World& world, renderer& renderer)
+    {
+        Object* selectedObject = drawSceneHierarchy(world, renderer);
+        drawInspector(selectedObject);
+        drawAssetBrowser(world, renderer);
     }
 }

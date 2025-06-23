@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(MyEngine)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,9 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
-add_compile_options(/utf-8)
+#add_compile_options(/utf-8)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
+add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
 
 find_package(Vulkan REQUIRED)
 
@@ -34,11 +35,14 @@ file(GLOB IMGUI_SOURCES
 
 add_library(imgui STATIC ${IMGUI_SOURCES})
 
+target_compile_options(imgui PUBLIC /utf-8)
+
 target_include_directories(imgui PUBLIC
     "${CMAKE_SOURCE_DIR}/include/imgui"
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan"
     "${CMAKE_SOURCE_DIR}/include/glfw/include"
     "${CMAKE_SOURCE_DIR}/include/glm"
+    "${CMAKE_SOURCE_DIR}/include/assimp/include"
     ${Vulkan_INCLUDE_DIRS}
 )
 
@@ -52,6 +56,9 @@ target_link_libraries(engine PRIVATE
     imgui
     glfw
     Vulkan::Vulkan
+    assimp
 )
+
+target_compile_options(engine PRIVATE /utf-8)
 
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT engine)

@@ -10,6 +10,8 @@ find_package(Vulkan REQUIRED)
 
 add_library(renderer ${RENDERER_SOURCES})
 
+target_compile_options(renderer PUBLIC /utf-8)
+
 target_include_directories(renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 

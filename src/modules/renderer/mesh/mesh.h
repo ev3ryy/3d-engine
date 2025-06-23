@@ -89,11 +89,15 @@ struct UniformBufferObject {
 
 class Mesh {
 public:
+    Mesh() = default;
     Mesh(const std::vector<vertex>& vertices, const std::vector<uint32_t>& indices)
         : vertices_(vertices), indices_(indices), indexCount(static_cast<uint32_t>(indices.size()))
     {
     }
     ~Mesh() {};
+
+    uint32_t materialIndex_ = 0;
+    std::string materialId_;
 
     const std::vector<vertex>& getVertices() const { return vertices_; }
     const std::vector<uint32_t>& getIndices() const { return indices_; }
@@ -111,7 +115,7 @@ public:
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
 
-private:
+//private:
     std::vector<vertex> vertices_;
     std::vector<uint32_t> indices_;
 };
