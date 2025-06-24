@@ -65,7 +65,6 @@ namespace ui {
 
     Object* drawSceneHierarchy(World& world, renderer& renderer) {
         static Object* selectedObject = nullptr;
-
         ImGui::Begin("Scene Hierarchy");
 
         if (ImGui::Button("Create Primitive")) {
@@ -73,33 +72,38 @@ namespace ui {
         }
 
         if (ImGui::BeginPopup("Primitive Popup")) {
-            auto createPrimitive = [&](const std::string& name, const auto& primitiveGenerator) {
-                auto newObject = world.createObject(name);
-                auto [vertices, indices] = primitiveGenerator();
+            auto createAndSpawnPrimitive = [&](const std::string& primitiveName, const std::function<std::pair<std::vector<vertex>, std::vector<uint32_t>>()>& generator) {
+                if (!ResourceManager::Get().GetMesh(primitiveName)) {
+                    ResourceManager::Get().CreatePrimitive(primitiveName, generator);
+                }
 
-                auto pipeline = renderer.getPipeline();
-                size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(vertices);
-                size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(indices);
+                std::shared_ptr<Material> defaultMat = ResourceManager::Get().GetMaterial("DefaultPBRMaterial");
+                if (!defaultMat) {
+                    defaultMat = std::make_shared<Material>();
+                    defaultMat->name = "DefaultPBRMaterial";
+                    defaultMat->albedoColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+                    defaultMat->roughness = 0.5f;
+                    defaultMat->metallic = 0.0f;
+                    defaultMat->ambientOcclusion = 1.0f;
+                    ResourceManager::Get().RegisterMaterial("DefaultPBRMaterial", defaultMat);
+                }
 
-                auto mesh = std::make_shared<Mesh>(vertices, indices);
-                mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                mesh->indexCount = static_cast<uint32_t>(indices.size());
-                mesh->vertexCount = static_cast<uint32_t>(vertices.size());
+                auto mesh = ResourceManager::Get().GetMesh(primitiveName);
 
-                auto material = std::make_shared<Material>();
+                if (!mesh || !defaultMat) {
+                    LOG_ERROR("Failed to get mesh (%s) or default material (DefaultPBRMaterial) from ResourceManager!", primitiveName.c_str());
+                    return;
+                }
 
-                newObject->addComponent<MeshRendererComponent>(mesh, material);
+                auto newObject = world.createObject(primitiveName);
+                newObject->addComponent<transformComponent>();
+                newObject->addComponent<MeshRendererComponent>(mesh, defaultMat->name);
 
                 ImGui::CloseCurrentPopup();
                 };
 
-            if (ImGui::Selectable("Cube")) {
-                createPrimitive("Cube", primitives::createCube);
-            }
-            if (ImGui::Selectable("Pyramid")) {
-                createPrimitive("Pyramid", primitives::createPyramid);
-            }
+            if (ImGui::Selectable("Cube")) { createAndSpawnPrimitive("Cube", primitives::createCube); }
+            if (ImGui::Selectable("Pyramid")) { createAndSpawnPrimitive("Pyramid", primitives::createPyramid); }
 
             ImGui::EndPopup();
         }
@@ -110,12 +114,13 @@ namespace ui {
         const auto& allObjects = world.getAllObjects();
         for (const auto& objPtr : allObjects) {
             Object* currentObject = objPtr.get();
+
             if (currentObject->getComponent<CameraComponent>() != nullptr) {
                 continue;
             }
 
-            char label[64];
-            snprintf(label, sizeof(label), "%s (ID: %d)", currentObject->getName().c_str(), currentObject->getID());
+            char label[128];
+            snprintf(label, sizeof(label), "%s (ID: %u)", currentObject->getName().c_str(), currentObject->getID());
 
             if (ImGui::Selectable(label, selectedObject == currentObject)) {
                 selectedObject = currentObject;
@@ -126,12 +131,12 @@ namespace ui {
         return selectedObject;
     }
 
+
     void drawInspector(Object* selectedObject) {
         if (!selectedObject) return;
 
         ImGui::Begin("Inspector");
 
-        // ... ваш код инспектора остается без изменений ...
         ImGui::Text("Editing: %s", selectedObject->getName().c_str());
         ImGui::Separator();
 
@@ -148,13 +153,38 @@ namespace ui {
         ImGui::Separator();
 
         if (MeshRendererComponent* meshRenderer = selectedObject->getComponent<MeshRendererComponent>()) {
-            if (std::shared_ptr<Material> material = meshRenderer->getMaterial()) {
-                ImGui::Text("Material");
-                ImGui::ColorEdit3("Diffuse Color", &material->diffuseColor.r);
-                ImGui::DragFloat("Ambient Factor", &material->ambientFactor, 0.01f, 0.0f, 5.0f);
+            std::shared_ptr<Material> materialDef = ResourceManager::Get().GetMaterial(meshRenderer->getMaterialID());
+
+            if (materialDef) {
+                ImGui::Text("Material: %s", materialDef->name.c_str());
+
+                if (ImGui::ColorEdit4("Albedo Color", &materialDef->albedoColor.r)) {
+                    materialDef->isDirty = true;
+                }
+                if (ImGui::DragFloat("Roughness", &materialDef->roughness, 0.01f, 0.0f, 1.0f)) {
+                    materialDef->isDirty = true;
+                }
+                if (ImGui::DragFloat("Metallic", &materialDef->metallic, 0.01f, 0.0f, 1.0f)) {
+                    materialDef->isDirty = true;
+                }
+                if (ImGui::DragFloat("Ambient Occlusion", &materialDef->ambientOcclusion, 0.01f, 0.0f, 1.0f)) {
+                    materialDef->isDirty = true;
+                }
+
+                if (ImGui::BeginCombo("Select Material", materialDef->name.c_str())) {
+                    for (const auto& [id, mat] : ResourceManager::Get().GetAllMaterials()) {
+                        bool is_selected = (id == materialDef->name);
+                        if (ImGui::Selectable(id.c_str(), is_selected)) {
+                            meshRenderer->setMaterialId(id);
+                        }
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
             }
             else {
-                ImGui::Text("Object has no Material.");
+                ImGui::Text("Material not found: %s", meshRenderer->getMaterialID().c_str());
             }
         }
         else {
@@ -165,12 +195,11 @@ namespace ui {
     }
 
     void drawAssetBrowser(World& world, renderer& renderer) {
-        static char modelPathBuffer[256] = "assets/models/sponza/sponza.obj"; // Путь по умолчанию
+        static char modelPathBuffer[256] = "assets/models/sponza/sponza.obj";
         static std::string selectedMeshID;
 
         ImGui::Begin("Asset Browser");
 
-        // --- Секция загрузки ---
         ImGui::Text("Load New Model");
         ImGui::InputText("##ModelPath", modelPathBuffer, sizeof(modelPathBuffer));
         ImGui::SameLine();
@@ -179,7 +208,6 @@ namespace ui {
         }
         ImGui::Separator();
 
-        // --- Секция отображения ресурсов ---
         if (ImGui::CollapsingHeader("Meshes")) {
             for (const auto& [id, mesh] : ResourceManager::Get().GetAllMeshes()) {
                 if (ImGui::Selectable(id.c_str(), selectedMeshID == id)) {
@@ -196,46 +224,47 @@ namespace ui {
 
         ImGui::Separator();
 
-        // --- Секция спавна объекта ---
         if (!selectedMeshID.empty()) {
             ImGui::Text("Selected: %s", selectedMeshID.c_str());
             if (ImGui::Button("Spawn in World")) {
-
-                // Получаем "шаблон" меша из менеджера
                 std::shared_ptr<Mesh> meshTemplate = ResourceManager::Get().GetMesh(selectedMeshID);
                 if (meshTemplate) {
-                    // Проверяем, был ли этот меш уже загружен на GPU.
-                    // Мы используем vertexCount как флаг. Если он 0, значит меш еще только на CPU.
                     if (meshTemplate->vertexCount == 0) {
                         LOG_INFO("First time spawning mesh '%s'. Uploading to GPU...", selectedMeshID.c_str());
 
-                        // ЭТОТ КОД АНАЛОГИЧЕН ВАШЕМУ КОДУ СОЗДАНИЯ ПРИМИТИВОВ
                         auto pipeline = renderer.getPipeline();
                         size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(meshTemplate->getVertices());
                         size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(meshTemplate->getIndices());
 
-                        // Обновляем данные прямо в меше, который хранится в ResourceManager.
-                        // Теперь все последующие спавны этого меша будут использовать уже готовые оффсеты.
                         meshTemplate->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
                         meshTemplate->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
                         meshTemplate->vertexCount = static_cast<uint32_t>(meshTemplate->getVertices().size());
                         meshTemplate->indexCount = static_cast<uint32_t>(meshTemplate->getIndices().size());
                     }
 
-                    // Получаем материал, используя ID, который мы сохранили в меше
-                    std::shared_ptr<Material> material = nullptr;//ResourceManager::Get().GetMaterial(meshTemplate->materialId_);
-                    if (!material) {
-                        // Если материала нет, создаем и регистрируем материал по умолчанию
-                        material = std::make_shared<Material>();
-                        material->name = "Default Material";
-                        //ResourceManager::Get().RegisterMaterial("default", material);
+                    std::string materialToUseID = meshTemplate->materialId_;
+                    if (materialToUseID.empty() || !ResourceManager::Get().GetMaterial(materialToUseID)) {
+                        std::shared_ptr<Material> defaultMat = ResourceManager::Get().GetMaterial("DefaultPBRMaterial");
+                        if (!defaultMat) {
+                            defaultMat = std::make_shared<Material>();
+                            defaultMat->name = "DefaultPBRMaterial";
+                            defaultMat->albedoColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+                            defaultMat->roughness = 0.5f;
+                            defaultMat->metallic = 0.0f;
+                            defaultMat->ambientOcclusion = 1.0f;
+                            ResourceManager::Get().RegisterMaterial("DefaultPBRMaterial", defaultMat);
+                        }
+                        materialToUseID = defaultMat->name;
                     }
 
-                    // Создаем объект в мире
+                    if (materialToUseID.empty()) {
+                        LOG_ERROR("Could not determine a suitable material ID for spawning mesh '%s'!", selectedMeshID.c_str());
+                        return;
+                    }   
+
                     auto newObject = world.createObject(selectedMeshID);
-                    newObject->addComponent<MeshRendererComponent>(meshTemplate, material);
-                    // TransformComponent, скорее всего, добавляется в createObject, если нет - добавьте
                     newObject->addComponent<transformComponent>();
+                    newObject->addComponent<MeshRendererComponent>(meshTemplate, materialToUseID);
                 }
             }
         }

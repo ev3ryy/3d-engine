@@ -7,7 +7,7 @@
 #include <vector>
 #include <stdexcept>
 
-#include "buffers.h"
+#include "buffers/buffers.h"
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;

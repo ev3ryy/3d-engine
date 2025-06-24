@@ -10,17 +10,18 @@
 
 class MeshRendererComponent : public component {
 public:
-	static const bool isUnique = false; // optional
+	static const bool isUnique = true; // optional
 
-	MeshRendererComponent(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material);
+	MeshRendererComponent(std::shared_ptr<Mesh> mesh, const std::string& materialID);
 	~MeshRendererComponent() override = default;
 
 	const std::shared_ptr<Mesh>& getMesh() const;
-	const std::shared_ptr<Material>& getMaterial() const;
+	const std::string& getMaterialID() const;
+	void setMaterialId(const std::string& id);
 
 private:
 	std::shared_ptr<Mesh> mesh;
-	std::shared_ptr<Material> material;
+	std::string materialID;
 
 };
 

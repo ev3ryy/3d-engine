@@ -1,29 +1,57 @@
+// Material.h
 #ifndef RENDERER_MATERIAL
 #define RENDERER_MATERIAL
 
+#include <vulkan/buffers/uniform_buffer.h>
 #include <string>
 #include <glm/glm.hpp>
 
-struct Material {
+struct MaterialData {
+    alignas(16) glm::vec4 albedoColor;
+    alignas(16) glm::vec4 pbrParams;
+    // pbrParams.x = metallic
+    // pbrParams.y = roughness
+    // pbrParams.z = ambientOcclusion
+    // pbrParams.w = padding for alignment
+
+    alignas(16) glm::ivec4 textureFlags;
+    // textureFlags.x = hasAlbedoMap
+    // textureFlags.y = hasNormalMap
+    // textureFlags.z = hasMetallicRoughessMap
+    // textureFlags.w = hasAoMap
+};
+
+class Material {
+public:
     std::string name;
-    glm::vec3 diffuseColor = glm::vec3(1.0f);
-    float ambientFactor = 0.1f; 
+    std::string shaderName;
+
+    glm::vec4 albedoColor = glm::vec4(1.0f);
+    float metallic = 0.0f;
+    float roughness = 1.0f;
+    float ambientOcclusion = 1.0f;
+
+    std::string albedoPath;
+    std::string normalMapPath;
+    std::string metallicRoughnessPath;
+    std::string aoMapPath;
+
+    bool isDirty = true;
+
+    MaterialData toMaterialData() const {
+        MaterialData data;
+        data.albedoColor = albedoColor;
+        data.pbrParams = glm::vec4(metallic, roughness, ambientOcclusion, 0.0f);
+        data.textureFlags = glm::ivec4(!albedoPath.empty(), !normalMapPath.empty(), !metallicRoughnessPath.empty(), !aoMapPath.empty());
+        return data;
+    }
 };
 
-struct MaterialUniform {
-    glm::vec4 diffuseColor; 
-    float ambientFactor;
-    glm::vec3 pad;
-    glm::vec4 sunParameters;
+class MaterialInstance {
+public:
+    Material* material;
+    std::unique_ptr<UniformBuffer> buffer;
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 };
-
-inline static MaterialUniform ConvertMaterial(const Material& mat) {
-    MaterialUniform out = {};
-    out.diffuseColor = glm::vec4(mat.diffuseColor, 1.0f);
-    out.ambientFactor = mat.ambientFactor;
-    out.pad = glm::vec3(0.0f);
-    out.sunParameters = glm::vec4(glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f)), 2.0f);
-    return out;
-}
 
 #endif // RENDERER_MATERIAL

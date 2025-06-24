@@ -22,10 +22,6 @@ void Object::update(float deltaTime)
 			component->update(deltaTime);
 		}
 	}
-
-	//for (const auto& component : children) {
-	//	component->update(deltaTime);
-	//}
 }
 
 const std::string& Object::getName() const

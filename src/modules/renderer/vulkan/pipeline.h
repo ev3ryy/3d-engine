@@ -13,7 +13,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include "buffers.h"
+#include "buffers/buffers.h"
 #include "queuefamily.h"
 #include "swapchain.h"
 #include "validation.h"
@@ -28,15 +28,20 @@ constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 struct PushConstantData {
     glm::mat4 model;
-    MaterialUniform material;
 };
 
 struct RenderItem {
     glm::mat4 modelMatrix;
-    MaterialUniform material;
+    MaterialInstance material;
     uint32_t indexCount;
     uint32_t indexOffset;
     uint32_t vertexOffset;
+};
+
+struct RenderObject {
+    MaterialInstance* material = nullptr;
+    Mesh* mesh = nullptr;
+    glm::mat4 modelMatrix;
 };
 
 struct RenderFrameData {
@@ -57,8 +62,10 @@ public:
     pipeline();
 	~pipeline();
 
-    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj);
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData);
+    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj, glm::vec3 cameraPos);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData, const std::vector<RenderObject>& renderObjects);
+
+    MaterialInstance* getOrCreateMaterialInstance(Material& material);
 
     VkInstance                      getInstance() const { return instance; }
     VkPhysicalDevice                getPhysicalDevice() const { return physicalDevice; }
@@ -125,7 +132,8 @@ private:
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void createDescriptorSetLayout();
     void createUniformBuffers();
-    void createDescriptorSets();
+    void createGlobalDescriptorSet();
+    void createMaterialDescriptorPool();
 
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -146,9 +154,11 @@ private:
     uint32_t queueFamily = 0;
 
     VkDescriptorPool descriptorPool;
+    VkDescriptorPool materialDescriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
-    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorSetLayout globalDescriptorSetLayout;
+    VkDescriptorSetLayout materialDescriptorSetLayout;
 
     //VkBuffer vertexBuffer; // vertices
     //VkDeviceMemory vertexBufferMemory;
@@ -184,6 +194,50 @@ private:
     VkImage depthImage;
     VkImageView depthImageView;
     VkDeviceMemory depthImageMemory;
+
+    std::unordered_map<std::string, std::unique_ptr<MaterialInstance>> materialCache;
+
+
+    // delete this
+    VkImage defaultAlbedoImage = VK_NULL_HANDLE;
+    VmaAllocation defaultAlbedoImageAllocation = nullptr;
+    VkImageView defaultAlbedoImageView = VK_NULL_HANDLE;
+    VkSampler defaultAlbedoSampler = VK_NULL_HANDLE;
+
+    VkImage defaultNormalImage = VK_NULL_HANDLE;
+    VmaAllocation defaultNormalImageAllocation = nullptr;
+    VkImageView defaultNormalImageView = VK_NULL_HANDLE;
+    VkSampler defaultNormalSampler = VK_NULL_HANDLE;
+
+    VkImage defaultMetallicRoughnessImage = VK_NULL_HANDLE;
+    VmaAllocation defaultMetallicRoughnessImageAllocation = nullptr;
+    VkImageView defaultMetallicRoughnessImageView = VK_NULL_HANDLE;
+    VkSampler defaultMetallicRoughnessSampler = VK_NULL_HANDLE;
+
+    VkImage defaultAoImage = VK_NULL_HANDLE;
+    VmaAllocation defaultAoImageAllocation = nullptr;
+    VkImageView defaultAoImageView = VK_NULL_HANDLE;
+    VkSampler defaultAoSampler = VK_NULL_HANDLE;
+
+    void createDefaultTextures();
+    void cleanupDefaultTextures();
+
+    void createSingleDefaultTexture(
+        uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
+        VkImage& image, VmaAllocation& imageAllocation, VkImageView& imageView,
+        const std::vector<unsigned char>& pixelData
+    );
+    void createDefaultSampler(VkSampler& sampler);
+
+    VkDescriptorImageInfo GetDefaultAlbedoTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultNormalTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultMetallicRoughnessTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultAoTextureInfo() const;
+
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkCommandBuffer commandBuffer);
 };
 
 #endif // RENDERER_VULKAN_H

@@ -19,7 +19,8 @@ namespace ModelLoader {
             aiProcess_Triangulate |
             aiProcess_GenNormals |
             aiProcess_CalcTangentSpace |
-            aiProcess_FlipUVs);
+            aiProcess_FlipUVs |
+            aiProcess_FlipWindingOrder);
 
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
             std::cerr << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
@@ -60,6 +61,15 @@ namespace ModelLoader {
                 else {
                     vertex.texCoord = { 0.0f, 0.0f };
                 }
+
+                if (mesh->HasTangentsAndBitangents()) {
+                    vertex.tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+                    vertex.bitangent = { mesh->mBitangents[i].y, mesh->mBitangents[i].y, mesh->mBitangents[i].z};
+                }
+                else {
+                    vertex.tangent = { 0.0f, 0.0f, 0.0f };
+                    vertex.bitangent = { 0.0f, 0.0f, 0.0f };
+                }
             }
 
             for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
@@ -94,7 +104,7 @@ namespace ModelLoader {
 
             aiColor4D color;
             if (aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &color) == AI_SUCCESS) {
-                engineMaterial->diffuseColor = glm::vec3(color.r, color.g, color.b);
+                engineMaterial->albedoColor = glm::vec4(color.r, color.g, color.b, color.a);
             }
 
             assetData.materials[materialId] = engineMaterial;

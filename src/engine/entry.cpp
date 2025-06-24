@@ -4,6 +4,8 @@
 #include "scene/world/world.h"
 #include "scene/object/components/camera_component.h"
 
+#include "resources/manager/resource_manager.h"
+
 #include <imgui.h>
 #include <vulkan/imgui_impl_glfw.h>
 #include <vulkan/imgui_impl_vulkan.h>
@@ -91,7 +93,7 @@ void Engine::mainLoop() {
         }
 
         ImGui::Render();
-        _renderer->render(*world.get());
+        _renderer->render(*world.get(), ResourceManager::Get());
     }
 
     _renderer->waitDeviceIdle();
@@ -102,6 +104,8 @@ int main() {
 
     auto _core = std::make_unique<core>();
     auto _renderer = std::make_unique<renderer>();
+
+    ResourceManager::Get().Initialize(_renderer.get());
 
     ui::debug::initialize(*_renderer); // initialize imgui debug ui
 

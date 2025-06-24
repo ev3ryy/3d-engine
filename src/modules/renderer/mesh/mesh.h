@@ -19,6 +19,8 @@ struct vertex {
     glm::vec3 pos;
     glm::vec3 normal;
     glm::vec2 texCoord;
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
 
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -28,8 +30,8 @@ struct vertex {
         return bindingDescription;
     }
 
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+    static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions{};
 
         // 0: position
         attributeDescriptions[0].binding = 0;
@@ -48,6 +50,16 @@ struct vertex {
         attributeDescriptions[2].location = 2;
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(vertex, texCoord);
+
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(vertex, tangent);
+
+        attributeDescriptions[4].binding = 0;
+        attributeDescriptions[4].location = 4;
+        attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[4].offset = offsetof(vertex, bitangent);
 
         return attributeDescriptions;
     }
@@ -83,8 +95,10 @@ struct InstanceData {
 struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;
+
     glm::vec3 sunLightDirection;
     float sunLightIntensity;
+    alignas(16) glm::vec3 cameraPosition;
 };
 
 class Mesh {
@@ -93,6 +107,7 @@ public:
     Mesh(const std::vector<vertex>& vertices, const std::vector<uint32_t>& indices)
         : vertices_(vertices), indices_(indices), indexCount(static_cast<uint32_t>(indices.size()))
     {
+
     }
     ~Mesh() {};
 
@@ -105,7 +120,7 @@ public:
     static VkVertexInputBindingDescription getBindingDescription() {
         return vertex::getBindingDescription();
     }
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+    static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions() {
         return vertex::getAttributeDescriptions();
     }
 

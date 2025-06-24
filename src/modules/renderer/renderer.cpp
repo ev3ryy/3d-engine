@@ -4,6 +4,7 @@
 #include "vulkan/pipeline.h"
 
 #include "world/world.h"
+#include "../resources/manager/resource_manager.h"
 #include "object/components/transform_component.h"
 #include "object/components/mesh_renderer_component.h"
 
@@ -30,7 +31,43 @@ void renderer::init() {
 	_pipeline = new pipeline();
 }
 
-void renderer::render(const World& world)
+
+void renderer::syncWithWorld(const World& world, ResourceManager& resourceManager)
+{
+	_renderObjects.clear();
+
+	auto renderable = world.getRenderableObjects();
+	for (Object* obj : renderable) {
+		auto meshRenderer = obj->getComponent<MeshRendererComponent>();
+		if (!meshRenderer) {
+			continue;
+		}
+
+		const std::string& materialID = meshRenderer->getMaterialID();
+
+		std::shared_ptr<Material> material = resourceManager.GetMaterial(materialID);
+		if (!material) {
+			continue;
+		}
+
+		MaterialInstance* materialInstance = _pipeline->getOrCreateMaterialInstance(*material);
+
+		if (material->isDirty) {
+			MaterialData data = material->toMaterialData();
+			materialInstance->buffer->writeToBuffer(&data, sizeof(MaterialData));
+			material->isDirty = false;
+		}
+
+		RenderObject renderObj;
+		renderObj.mesh = meshRenderer->getMesh().get();
+		renderObj.material = materialInstance;
+		renderObj.modelMatrix = obj->getComponent<transformComponent>()->getWorldMatrix();
+
+		_renderObjects.push_back(renderObj);
+	}
+}
+
+void renderer::render(const World& world, ResourceManager& resourceManager)
 {
 	if (!_pipeline || _pipeline->getDevice() == VK_NULL_HANDLE) {
 		LOG_ERROR("Renderer pipeline is not initialized!");
@@ -78,10 +115,10 @@ void renderer::render(const World& world)
 	renderData.viewMatrix = viewMatrix;
 	renderData.projMatrix = projMatrix;
 
-	_pipeline->updateUniformBuffer(currentFrameIndex, viewMatrix, projMatrix);
+	_pipeline->updateUniformBuffer(currentFrameIndex, viewMatrix, projMatrix, world.getActiveRenderCamera().position);
 	renderData.globalDescriptorSet = _pipeline->getDescriptorSets()[currentFrameIndex];
 
-	std::vector<Object*> renderableObjects = world.getRenderableObjects();
+	/*std::vector<Object*> renderableObjects = world.getRenderableObjects();
 
 	for (Object* obj : renderableObjects) {
 		transformComponent* transform = obj->getComponent<transformComponent>();
@@ -110,7 +147,7 @@ void renderer::render(const World& world)
 		renderItem.vertexOffset = mesh->vertexOffset;
 
 		renderData.renderItems.push_back(renderItem);
-	}
+	}*/
 
 	ImVec4 clearColor = ImVec4(0.23f, 0.22f, 0.22f, 1.00f);
 
@@ -120,7 +157,9 @@ void renderer::render(const World& world)
 	renderData.clearColor = clearColor;
 	renderData.imguiDrawData = ImGui::GetDrawData();
 
-	_pipeline->recordCommandBuffer(_pipeline->commandBuffers[currentFrameIndex], imageIndex, renderData);
+	syncWithWorld(world, resourceManager);
+
+	_pipeline->recordCommandBuffer(_pipeline->commandBuffers[currentFrameIndex], imageIndex, renderData, _renderObjects);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
