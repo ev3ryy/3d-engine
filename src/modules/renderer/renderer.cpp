@@ -9,7 +9,7 @@
 #include "object/components/mesh_renderer_component.h"
 
 #include <GLFW/glfw3.h>
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 renderer::renderer()
 {
@@ -31,39 +31,47 @@ void renderer::init() {
 	_pipeline = new pipeline();
 }
 
+void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, pipeline* pipeline) {
+	if (!currentObject) {
+		return;
+	}
+
+	MeshRendererComponent* meshRenderer = currentObject->getComponent<MeshRendererComponent>();
+	if (meshRenderer) {
+		std::shared_ptr<Mesh> meshPtr = meshRenderer->getMesh();
+		const std::string& materialID = meshRenderer->getMaterialID();
+		std::shared_ptr<Material> materialPtr = resourceManager.GetMaterial(materialID);
+
+		if (meshPtr && materialPtr) {
+
+			RenderObject renderObj;
+			renderObj.mesh = meshPtr.get();
+			renderObj.modelMatrix = currentObject->getWorldMatrix();
+
+			MaterialInstance* materialInstance = pipeline->getOrCreateMaterialInstance(*materialPtr);
+			renderObj.material = materialInstance;
+
+			if (materialPtr->isDirty) {
+				MaterialData data = materialPtr->toMaterialData();
+				materialInstance->buffer->writeToBuffer(&data, sizeof(MaterialData));
+				materialPtr->isDirty = false;
+			}
+			renderObjects.push_back(renderObj);
+		}
+	}
+
+	for (const auto& childPtr : currentObject->getChildren()) {
+		collectRenderableObjectsRecursive(childPtr.get(), renderObjects, resourceManager, pipeline);
+	}
+}
 
 void renderer::syncWithWorld(const World& world, ResourceManager& resourceManager)
 {
 	_renderObjects.clear();
 
-	auto renderable = world.getRenderableObjects();
-	for (Object* obj : renderable) {
-		auto meshRenderer = obj->getComponent<MeshRendererComponent>();
-		if (!meshRenderer) {
-			continue;
-		}
-
-		const std::string& materialID = meshRenderer->getMaterialID();
-
-		std::shared_ptr<Material> material = resourceManager.GetMaterial(materialID);
-		if (!material) {
-			continue;
-		}
-
-		MaterialInstance* materialInstance = _pipeline->getOrCreateMaterialInstance(*material);
-
-		if (material->isDirty) {
-			MaterialData data = material->toMaterialData();
-			materialInstance->buffer->writeToBuffer(&data, sizeof(MaterialData));
-			material->isDirty = false;
-		}
-
-		RenderObject renderObj;
-		renderObj.mesh = meshRenderer->getMesh().get();
-		renderObj.material = materialInstance;
-		renderObj.modelMatrix = obj->getComponent<transformComponent>()->getWorldMatrix();
-
-		_renderObjects.push_back(renderObj);
+	const auto& rootObjects = world.getAllObjects();
+	for (const auto& objPtr : rootObjects) {
+		collectRenderableObjectsRecursive(objPtr.get(), _renderObjects, resourceManager, _pipeline);
 	}
 }
 
@@ -91,7 +99,8 @@ void renderer::render(const World& world, ResourceManager& resourceManager)
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		window::framebufferResized = false;
-		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getRenderPass(), _pipeline->getDepthImageView());
+		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getLightingRenderPass(), _pipeline->getDepthImageView());
+		return;
 	}
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		LOG_CRITICAL("Failed to acquire swap chain image");
@@ -107,7 +116,7 @@ void renderer::render(const World& world, ResourceManager& resourceManager)
 	glm::mat4 projMatrix = glm::perspective(
 		glm::radians(activeCamera.fov),
 		(float)_pipeline->getSwapchain()->swapChainExtent.width / (float)_pipeline->getSwapchain()->swapChainExtent.height,
-		0.1f, 1000.0f // near/far
+		activeCamera.getNearPlane(), activeCamera.getFarPlane()
 	);
 
 	projMatrix[1][1] *= -1;
@@ -117,37 +126,6 @@ void renderer::render(const World& world, ResourceManager& resourceManager)
 
 	_pipeline->updateUniformBuffer(currentFrameIndex, viewMatrix, projMatrix, world.getActiveRenderCamera().position);
 	renderData.globalDescriptorSet = _pipeline->getDescriptorSets()[currentFrameIndex];
-
-	/*std::vector<Object*> renderableObjects = world.getRenderableObjects();
-
-	for (Object* obj : renderableObjects) {
-		transformComponent* transform = obj->getComponent<transformComponent>();
-		MeshRendererComponent* meshRenderer = obj->getComponent<MeshRendererComponent>();
-
-		if (!transform || !meshRenderer) {
-			continue;
-		}
-
-		std::shared_ptr<Mesh> meshPtr = meshRenderer->getMesh();
-		std::shared_ptr<Material> materialPtr = meshRenderer->getMaterial();
-
-		if (!meshPtr || !materialPtr) {
-			continue;
-		}
-
-		Mesh* mesh = meshPtr.get();
-		Material* material = materialPtr.get();
-		MaterialUniform matUniform = ConvertMaterial(*material);
-
-		RenderItem renderItem{};
-		renderItem.modelMatrix = transform->getWorldMatrix();
-		renderItem.material = matUniform;
-		renderItem.indexCount = mesh->indexCount;
-		renderItem.indexOffset = mesh->indexOffset;
-		renderItem.vertexOffset = mesh->vertexOffset;
-
-		renderData.renderItems.push_back(renderItem);
-	}*/
 
 	ImVec4 clearColor = ImVec4(0.23f, 0.22f, 0.22f, 1.00f);
 
@@ -199,7 +177,7 @@ void renderer::render(const World& world, ResourceManager& resourceManager)
 	bool framebufferResized = window::framebufferResized;
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
 		window::framebufferResized = false;
-		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getRenderPass(), _pipeline->getDepthImageView());
+		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getLightingRenderPass(), _pipeline->getDepthImageView());
 	}
 	else if (result != VK_SUCCESS) {
 		LOG_CRITICAL("Failed to present swap chain image");

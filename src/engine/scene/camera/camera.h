@@ -75,6 +75,9 @@ public:
             movementSpeed = value;
     }
 
+    float getNearPlane() const { return near; }
+    float getFarPlane() const { return far; }
+
     glm::vec3 position;
     glm::vec3 front;
     glm::vec3 up;
@@ -88,6 +91,9 @@ public:
     float mouseSensitivity;
 
     float fov;
+
+    float near = 0.1f;
+    float far = 1000.0f;
 
 private:
     void updateCameraVectors() {

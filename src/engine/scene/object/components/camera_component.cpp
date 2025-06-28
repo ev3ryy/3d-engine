@@ -6,6 +6,8 @@
 #include <window/window.h>
 #include <input.h>
 
+#include <logs.h>
+
 void CameraComponent::update(float deltaTime) {
     transformComponent* transform = getOwner()->getComponent<transformComponent>();
     if (!transform) return;
@@ -18,26 +20,26 @@ void CameraComponent::update(float deltaTime) {
         glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         float xoffset, yoffset;
-        input::getMouseDelta(xoffset, yoffset);
+        Input::instance().getMouseDelta(xoffset, yoffset);
         if (xoffset != 0.0f || yoffset != 0.0f) {
             camera.processMouseMovement(xoffset, yoffset);
         }
 
-        bool shiftDown = input::IsKeyDown(keycode::LShift);
+        bool shiftDown = Input::instance().isKeyDown(keycode::LShift);
         float speedMultiplier = shiftDown ? 2.5f : 1.0f;
         float adjustedDeltaTime = deltaTime * speedMultiplier;
 
-        if (input::IsKeyDown(keycode::W))
+        if (Input::instance().isKeyDown(keycode::W))
             camera.processKeyboard(CameraMovement::FORWARD, adjustedDeltaTime);
-        if (input::IsKeyDown(keycode::S))
+        if (Input::instance().isKeyDown(keycode::S))
             camera.processKeyboard(CameraMovement::BACKWARD, adjustedDeltaTime);
-        if (input::IsKeyDown(keycode::A))
+        if (Input::instance().isKeyDown(keycode::A))
             camera.processKeyboard(CameraMovement::LEFT, adjustedDeltaTime);
-        if (input::IsKeyDown(keycode::D))
+        if (Input::instance().isKeyDown(keycode::D))
             camera.processKeyboard(CameraMovement::RIGHT, adjustedDeltaTime);
 
         float scrollX, scrollY;
-        input::getScrollDelta(scrollX, scrollY);
+        Input::instance().getScrollDelta(scrollX, scrollY);
         if (scrollY != 0.0f) {
             const float speedSensitivity = 0.2f;
             camera.setSpeed(camera.movementSpeed + scrollY * speedSensitivity);
@@ -47,7 +49,7 @@ void CameraComponent::update(float deltaTime) {
     else {
         glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         float dummyX, dummyY;
-        input::getMouseDelta(dummyX, dummyY);
+        Input::instance().getMouseDelta(dummyX, dummyY);
     }
 
     transform->position = camera.position;

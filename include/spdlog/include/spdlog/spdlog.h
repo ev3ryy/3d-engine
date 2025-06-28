@@ -374,9 +374,6 @@ inline void log_info(const char *fmt_str, Args... args) {
     spdlog::info(my_sprintf(fmt_str, args...));
 }
 
-// @INFO: info log message
-#define LOG_INFO(...) log_info(__VA_ARGS__)
-
 inline void log_error(const char *message) { spdlog::error(message); }
 
 template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)>>
@@ -384,18 +381,12 @@ inline void log_error(const char *fmt_str, Args... args) {
     spdlog::error(my_sprintf(fmt_str, args...));
 }
 
-// @INFO: error log message
-#define LOG_ERROR(...) log_error(__VA_ARGS__)
-
 inline void log_warn(const char *message) { spdlog::warn(message); }
 
 template <typename... Args, typename = std::enable_if_t<(sizeof...(Args) > 0)>>
 inline void log_warn(const char *fmt_str, Args... args) {
     spdlog::warn(my_sprintf(fmt_str, args...));
 }
-
-// @INFO: warning log message
-#define LOG_WARN(...) log_warn(__VA_ARGS__)
 
 inline void log_critical(const char *message) {
     spdlog::critical(message);
@@ -408,8 +399,5 @@ inline void log_critical(const char *fmt_str, Args... args) {
     spdlog::critical(message);
     throw std::runtime_error(message);
 }
-
-// @INFO: Critical error, throw log message and runtime_error
-#define LOG_CRITICAL(...) log_critical(__VA_ARGS__)
 
 #endif  // SPDLOG_H

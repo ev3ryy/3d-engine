@@ -6,10 +6,22 @@
 
 struct GLFWwindow;
 
-class input {
+class IInputProvider {
 public:
-    static input& instance() {
-        static input instance;
+    virtual ~IInputProvider() = default;
+
+    virtual bool isKeyDown(keycode key) const = 0;
+    virtual bool wasKeyPressed(keycode key) const = 0;
+    virtual bool wasKeyReleased(keycode key) const = 0;
+
+    virtual void getMouseDelta(float& xoffset, float& yoffset) const = 0;
+    virtual void getScrollDelta(float& xoffset, float& yoffset) const = 0;
+};
+
+class Input : public IInputProvider {
+public:
+    static Input& instance() {
+        static Input instance;
         return instance;
     }
 
@@ -17,29 +29,31 @@ public:
 
     static void update();
 
-    static bool IsKeyDown(keycode key);
-    static bool WasKeyPressed(keycode key);
-    static bool WasKeyReleased(keycode key);
+    bool isKeyDown(keycode key) const override;
+    bool wasKeyPressed(keycode key) const override;
+    bool wasKeyReleased(keycode key) const override;
 
-    static void OnKeyEvent(int glfwKey, int action);
+    void getMouseDelta(float& xoffset, float& yoffset) const override;
+    void getScrollDelta(float& xoffset, float& yoffset) const override;
 
-    static void OnCharEvent(unsigned int codepoint);
-
+    static void onKeyEvent(int glfwKey, int action);
+    static void onCharEvent(unsigned int codepoint);
     static void addMouseDelta(float xoffset, float yoffset);
-    static void getMouseDelta(float& xoffset, float& yoffset);
-
     static void addScrollDelta(float xoffset, float yoffset);
-    static void getScrollDelta(float& xoffset, float& yoffset);
 
 private:
-    static std::unordered_map<keycode, bool> keyStates;
-    static std::unordered_map<keycode, bool> keyDown;
-    static std::unordered_map<keycode, bool> keyUp;
+    Input() = default;
+    Input(const Input&) = delete;
+    Input& operator=(const Input&) = delete;
 
-    static float mouseDeltaX;
-    static float mouseDeltaY;
-    static float scrollDeltaX;
-    static float scrollDeltaY;
+    std::unordered_map<keycode, bool> keyStates;
+    std::unordered_map<keycode, bool> keyDown;
+    std::unordered_map<keycode, bool> keyUp;
+
+    float mouseDeltaX;
+    float mouseDeltaY;
+    float scrollDeltaX;
+    float scrollDeltaY;
 };
 
 #endif // INPUT_INPUT_H

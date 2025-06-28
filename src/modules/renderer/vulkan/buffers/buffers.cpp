@@ -1,5 +1,5 @@
 #include "buffers.h"
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 VmaAllocator buffers::createVmaAllocator(VkPhysicalDevice physicalDevice, VkDevice device, VkInstance instance)
 {
@@ -22,7 +22,7 @@ buffers::vertexBuffer::vertexBuffer(VkDevice device, VkQueue graphicsQueue, VkCo
 	: device(device), graphicsQueue(graphicsQueue), commandPool(commandPool), allocator(allocator), capacity(initialCapacity), used(0)
 {
 	createBuffer(capacity,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		&_vertexBuffer, &allocation,
 		VMA_MEMORY_USAGE_GPU_ONLY);
 }
@@ -83,7 +83,7 @@ void buffers::vertexBuffer::ensureCapacity(VkDeviceSize requiredSize)
 		VkBuffer newBuffer;
 		VmaAllocation newAllocation;
 		createBuffer(newCapacity,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			&newBuffer, &newAllocation,
 			VMA_MEMORY_USAGE_GPU_ONLY);
 
@@ -146,7 +146,7 @@ buffers::indexBuffer::indexBuffer(VkDevice device, VkQueue graphicsQueue, VkComm
 	: device(device), graphicsQueue(graphicsQueue), commandPool(commandPool), allocator(allocator), capacity(initialCapacity), used(0)
 {
 	createBuffer(capacity,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		&_indexBuffer, &allocation,
 		VMA_MEMORY_USAGE_GPU_ONLY);
 }
@@ -207,7 +207,7 @@ void buffers::indexBuffer::ensureCapacity(VkDeviceSize requiredSize)
 		VkBuffer newBuffer;
 		VmaAllocation newAllocation;
 		createBuffer(newCapacity,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			&newBuffer, &newAllocation,
 			VMA_MEMORY_USAGE_GPU_ONLY);
 

@@ -7,6 +7,16 @@
 #include <renderer.h>
 #include <vulkan/pipeline.h>
 
+#include <logs.h>
+
+#ifdef _WIN32
+#include <Windows.h>
+#define GET_FUNC GetProcAddress
+#else
+#include <dlfcn.h>
+#define GET_FUNC dlsym
+#endif
+
 ResourceManager& ResourceManager::Get() {
     static ResourceManager instance;
     return instance;
@@ -23,15 +33,6 @@ bool ResourceManager::CreatePrimitive(const std::string& name, std::function<std
 
     auto [vertices, indices] = generator();
     auto mesh = std::make_shared<Mesh>(vertices, indices);
-
-    auto pipeline = _renderer->getPipeline();
-    size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(vertices);
-    size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(indices);
-
-    mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-    mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-    mesh->indexCount = static_cast<uint32_t>(indices.size());
-    mesh->vertexCount = static_cast<uint32_t>(vertices.size());
 
     std::string materialId = name + "_Mat";
     mesh->materialId_ = materialId;
@@ -53,29 +54,30 @@ bool ResourceManager::CreatePrimitive(const std::string& name, std::function<std
 bool ResourceManager::LoadModel(const std::string& filepath) {
     if (!_renderer) return false;
 
-    LoadedAssetData loadedAssets = ModelLoader::Load(filepath);
-    if (loadedAssets.meshes.empty()) return false;
+    ModelData loadedModel = ModelLoader::Load(filepath);
+    if (!loadedModel.rootObject) return false;
 
-    for (const auto& [id, material] : loadedAssets.materials) {
+    for (const auto& [id, mesh] : loadedModel.meshes) {
+        RegisterMesh(id, mesh);
+    }
+    for (const auto& [id, material] : loadedModel.materials) {
         RegisterMaterial(id, material);
     }
 
-    for (const auto& [id, mesh] : loadedAssets.meshes) {
-        if (m_Meshes.count(id)) continue;
-
-        auto pipeline = _renderer->getPipeline();
-        size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(mesh->getVertices());
-        size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(mesh->getIndices());
-
-        mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-        mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(vertex));
-        mesh->vertexCount = static_cast<uint32_t>(mesh->getVertices().size());
-        mesh->indexCount = static_cast<uint32_t>(mesh->getIndices().size());
-
-        RegisterMesh(id, mesh);
-    }
-
+    m_ModelPrefabs[filepath] = std::move(loadedModel.rootObject);
     return true;
+}
+
+const std::unordered_map<std::string, std::unique_ptr<Object>>& ResourceManager::GetAllModelPrefabs() const {
+    return m_ModelPrefabs;
+}
+
+Object* ResourceManager::GetModelPrefab(const std::string& id) const {
+    auto it = m_ModelPrefabs.find(id);
+    if (it != m_ModelPrefabs.end()) {
+        return it->second.get();
+    }
+    return nullptr;
 }
 
 std::shared_ptr<Mesh> ResourceManager::GetMesh(const std::string& id) {
@@ -102,4 +104,42 @@ void ResourceManager::RegisterMaterial(const std::string& id, std::shared_ptr<Ma
     if (!m_Materials.count(id)) {
         m_Materials[id] = material;
     }
+}
+
+void ResourceManager::LoadAndRegisterScriptFactories(void* dllHandle)
+{
+    if (!dllHandle) {
+        LOG_ERROR("ResourceManager: Попытка зарегистрировать скрипты из невалидного хэндла DLL.");
+        return;
+    }
+
+    GetScriptRegistryFunc getRegistry = (GetScriptRegistryFunc)GET_FUNC((HMODULE)dllHandle, "GetScriptRegistry");
+    if (!getRegistry) {
+        LOG_ERROR("ResourceManager: Не удалось найти функцию 'GetScriptRegistry' в предоставленной DLL.");
+        return;
+    }
+
+    const auto& registry = getRegistry();
+    for (const auto& info : registry) {
+        if (m_ScriptFactories.find(info.scriptName) == m_ScriptFactories.end()) {
+            m_ScriptFactories[info.scriptName] = info.createFunc;
+            LOG_INFO("ResourceManager: Зарегистрирована фабрика для скрипта '%s'.", info.scriptName.c_str());
+        }
+    }
+}
+
+std::unique_ptr<IScriptInstance> ResourceManager::CreateScriptInstance(const std::string& name)
+{
+    auto it = m_ScriptFactories.find(name);
+    if (it != m_ScriptFactories.end()) {
+        return it->second();
+    }
+
+    LOG_ERROR("ResourceManager: Не удалось найти фабрику для создания скрипта с именем '%s'.", name.c_str());
+    return nullptr;
+}
+
+const std::unordered_map<std::string, ScriptFactoryFunc>& ResourceManager::GetAllScriptFactories() const
+{
+    return m_ScriptFactories;
 }

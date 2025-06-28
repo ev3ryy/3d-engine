@@ -1,7 +1,6 @@
 #include "core.h"
 
-
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 core::core()
 {

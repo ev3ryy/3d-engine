@@ -65,33 +65,6 @@ struct vertex {
     }
 };
 
-struct Transform {
-    glm::vec3 translation = glm::vec3(0.0f);
-    glm::vec3 rotation = glm::vec3(0.0f);
-    glm::vec3 scale = glm::vec3(1.0f);
-
-    glm::mat4 getModelMatrix() const {
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, translation);
-        model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, scale);
-        return model;
-    }
-};
-
-struct InstanceGroup {
-    mesh* meshPtr;
-    std::vector<Transform> instances;
-};
-
-struct InstanceData {
-    glm::mat4 model;
-    glm::vec3 color;
-    float _padding;
-};
-
 struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;

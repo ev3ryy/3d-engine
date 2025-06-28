@@ -73,7 +73,7 @@ public:
     VkQueue                         getGraphicsQueue() const { return graphicsQueue; }
     VkQueue                         getPresentQueue() const { return presentQueue; }
     uint32_t                        getQueueFamily() const { return queueFamily; }
-    VkRenderPass                    getRenderPass() const { return renderPass; }
+    VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
     VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
     uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
     uint32_t                        getImageCount() const { return _swapchain->imageCount; }
@@ -92,14 +92,14 @@ public:
 
     ImVec4 imClearColor;
 
-    std::vector<Mesh> meshes;
-    std::unordered_map<Mesh*, InstanceGroup> instanceGroups;
-
     std::vector<VkFence> inFlightFences;
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
 
     std::vector<VkCommandBuffer> commandBuffers;
+
+    glm::vec3 sunDirection = glm::vec3(1.0f, -1.0f, 1.0f);
+    float sunIntesnity = 50.0f;
 
 private:
 	void init();
@@ -119,7 +119,9 @@ private:
     VkFormat findDepthFormat();
     void createDepthResources();
     void createRenderPass();
-    void createGraphicsPipeline();
+    void createLightingRenderPass();
+    void createGBufferPipeline();
+    void createLightingPipeline();
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
     void createCommandPool();
@@ -135,6 +137,13 @@ private:
     void createGlobalDescriptorSet();
     void createMaterialDescriptorPool();
 
+    void createGBufferFramebuffer();
+    void createGBufferDescriptorSetLayout();
+    void createGBufferDescriptorSet();
+
+    void createGBufferResources();
+    void createGBufferSampler();
+
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
@@ -142,8 +151,6 @@ private:
     VkQueue presentQueue;
     VkSurfaceKHR surface;
 
-
-    VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
 
@@ -169,9 +176,9 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
-    std::vector<VkBuffer> materialUniformBuffers;
-    std::vector<VkDeviceMemory> materialUniformBuffersMemory;
-    std::vector<void*> materialUniformBuffersMapped;
+    //std::vector<VkBuffer> materialUniformBuffers;
+    //std::vector<VkDeviceMemory> materialUniformBuffersMemory;
+    //std::vector<void*> materialUniformBuffersMapped;
 
     std::vector<VkBuffer> modelUniformBuffers;
     std::vector<VkDeviceMemory> modelUniformBuffersMemory;
@@ -197,6 +204,34 @@ private:
 
     std::unordered_map<std::string, std::unique_ptr<MaterialInstance>> materialCache;
 
+    // gBuffer setup
+    struct {
+        VkImage albedo;
+        VkDeviceMemory albedoMem;
+        VkImageView albedoView;
+        VkImage normal;
+        VkDeviceMemory normalMem;
+        VkImageView normalView;
+        VkImage emissive;
+        VkDeviceMemory emissiveMem;
+        VkImageView emissiveView;
+    } gBuffer;
+
+    VkFramebuffer gBufferFramebuffer;
+
+    VkRenderPass gBufferRenderPass;
+
+    VkRenderPass lightingRenderPass;
+
+    VkPipeline gBufferPipeline;
+    VkPipelineLayout gBufferPipelineLayout;
+
+    VkPipeline lightingPipeline;
+    VkPipelineLayout lightingPipelineLayout;
+
+    VkSampler gBufferSampler;
+    VkDescriptorSetLayout gBufferDescriptorSetLayout;
+    VkDescriptorSet gBufferDescriptorSet;
 
     // delete this
     VkImage defaultAlbedoImage = VK_NULL_HANDLE;

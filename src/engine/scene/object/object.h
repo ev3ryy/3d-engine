@@ -4,11 +4,12 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <type_traits>
+#include <glm/glm.hpp>
 
 #include "component.h"
 #include "components/transform_component.h"
 #include "components/mesh_renderer_component.h"
-#include <logger.h>
 
 class Object {
 public:
@@ -17,24 +18,23 @@ public:
 
 	template<typename T, typename... Args>
 	T* addComponent(Args&&... args) {
-		static_assert(std::is_base_of<component, T>::value, "T must derive from component class");
+		static_assert(std::is_base_of<component, T>::value, "T must derive from Component class");
 
 		if constexpr (T::isUnique) {
 			if (getComponent<T>() != nullptr) {
-				LOG_WARN("Object '%s' already has a unique component", name);
 				return nullptr;
 			}
 		}
 
-		auto component = std::make_unique<T>(std::forward<Args>(args)...);
-		T* ptr = component.get();
-		component->setOwner(this);
+		auto newComponent = std::make_unique<T>(std::forward<Args>(args)...);
+		T* ptr = newComponent.get();
+		ptr->setOwner(this);
 
 		if constexpr (std::is_same_v<T, transformComponent>) {
 			transform = ptr;
 		}
 
-		components.push_back(std::move(component));
+		components.push_back(std::move(newComponent));
 		ptr->addedToObject();
 
 		return ptr;
@@ -42,14 +42,14 @@ public:
 
 	template<typename T>
 	T* getComponent() const {
-		static_assert(std::is_base_of<component, T>::value, "T must derive from component class");
+		static_assert(std::is_base_of<component, T>::value, "T must derive from Component class");
 
 		if constexpr (std::is_same_v<T, transformComponent>) {
 			return transform;
 		}
 
-		for (const auto& component : components) {
-			if (T* specificComponent = dynamic_cast<T*>(component.get())) {
+		for (const auto& comp_ptr : components) {
+			if (T* specificComponent = dynamic_cast<T*>(comp_ptr.get())) {
 				return specificComponent;
 			}
 		}
@@ -58,17 +58,38 @@ public:
 	}
 
 	virtual void update(float deltaTime);
-	
+
 	const std::string& getName() const;
 	int getID() const;
 
 	glm::mat4 getLocalMatrix() const {
 		if (transform) {
-			return transform->getWorldMatrix(); // @FIXME: getWorldMatrix = getLocalMatrix
+			return transform->getLocalMatrix();
 		}
 
 		return glm::mat4(1.0f);
 	}
+
+	glm::mat4 getWorldMatrix() const {
+		if (transform) {
+			return transform->getWorldMatrix();
+		}
+
+		return glm::mat4(1.0f);
+	}
+
+	transformComponent* getTransform() const { return transform; }
+
+	const std::vector<std::unique_ptr<Object>>& getChildren() const { return children; }
+	Object* getParent() const { return parent; }
+
+	void setName(const std::string& newName);
+
+	void addChild(std::unique_ptr<Object> child);
+	void removeChild(Object* child);
+	std::unique_ptr<Object> detachChild(Object* child);
+
+	std::unique_ptr<Object> deepCopy() const;
 
 	static int nextID;
 	bool canUpdate;
@@ -78,7 +99,7 @@ private:
 	int id;
 
 	Object* parent = nullptr;
-	std::vector<Object*> children;
+	std::vector<std::unique_ptr<Object>> children;
 
 	std::vector<std::unique_ptr<component>> components;
 	transformComponent* transform = nullptr;

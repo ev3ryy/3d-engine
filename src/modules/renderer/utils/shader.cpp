@@ -1,6 +1,6 @@
 #include "shader.h"
 
-#include <spdlog/spdlog.h>
+#include <logs.h>
 #include <fstream>
 
 namespace utils {

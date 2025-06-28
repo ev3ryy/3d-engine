@@ -24,21 +24,33 @@
 #include <filesystem>
 #include <sstream>
 
-config Engine::_config;
-
 Engine::Engine(core* coreInstance, renderer* rendererInstance)
     : _core(coreInstance), _renderer(rendererInstance)
 {
     if (!_renderer) {
         throw std::runtime_error("Renderer is null");
     }
+
+    ResourceManager::Get().Initialize(_renderer);
+
+    lastTime = std::chrono::high_resolution_clock::now();
 }
 
 Engine::~Engine() {
-
+    _renderer->waitDeviceIdle();
 }
 
-void Engine::mainLoop() {
+float Engine::getDeltaTime() {
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+    lastTime = currentTime;
+    return deltaTime;
+}
+
+bool Engine::run(std::function<void(float deltaTime, World&, renderer&, ResourceManager&)> editorUpdateCallback,
+    std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
+    GLFWwindow* windowHandle)
+{
     world = std::make_unique<World>();
 
     auto cameraObj = world->createObject("MainCamera");
@@ -51,23 +63,17 @@ void Engine::mainLoop() {
 
     world->setActiveRenderCamera(&cameraComp->camera);
 
-    bool flag = false;;
-
-    ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    static auto lastTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
-
     while (!glfwWindowShouldClose(window::_window)) {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
-        lastTime = currentTime;
+        float deltaTime = getDeltaTime();
 
-        input::update();
+        Input::update();
         glfwPollEvents();
 
         world->update(deltaTime);
+
+        if (gameUpdateCallback) {
+            gameUpdateCallback(deltaTime, *world.get(), ResourceManager::Get(), &Input::instance());
+        }
 
         int fb_width, fb_height;
         glfwGetFramebufferSize(window::_window, &fb_width, &fb_height);
@@ -81,40 +87,12 @@ void Engine::mainLoop() {
             last_fb_height = fb_height;
         }
 
-        // start imgui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        PerformanceStats stats = window::updatePerfomanceStats();
-
-        if (_config.mainWindow) {
-            ui::debug::drawDebugMenu(*world.get(), *_renderer);
+        if (editorUpdateCallback) {
+            editorUpdateCallback(deltaTime, *world.get(), *_renderer, ResourceManager::Get());
         }
 
-        ImGui::Render();
         _renderer->render(*world.get(), ResourceManager::Get());
     }
 
-    _renderer->waitDeviceIdle();
-}
-
-int main() {
-    logger::init();
-
-    auto _core = std::make_unique<core>();
-    auto _renderer = std::make_unique<renderer>();
-
-    ResourceManager::Get().Initialize(_renderer.get());
-
-    ui::debug::initialize(*_renderer); // initialize imgui debug ui
-
-    auto engine = std::make_unique<Engine>(_core.get(), _renderer.get());
-    Engine::_config.mainWindow = true;
-
-    input::init(window::_window);
-
-    engine->mainLoop();
-
-    return 0;
+    return false;
 }

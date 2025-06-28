@@ -19,7 +19,7 @@ target_include_directories(renderer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/engine/scene/components>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/modules/core>  
 
-    ${CMAKE_SOURCE_DIR}/include/spdlog/include
+    #${CMAKE_SOURCE_DIR}/include/spdlog/include
     ${CMAKE_SOURCE_DIR}/include/glfw/include
     ${CMAKE_SOURCE_DIR}/include/glm
     "${CMAKE_SOURCE_DIR}/include/imgui"
@@ -34,5 +34,6 @@ target_include_directories(renderer PUBLIC
 target_link_libraries(renderer PUBLIC
     core
     glfw
+    logger
     Vulkan::Vulkan
 )

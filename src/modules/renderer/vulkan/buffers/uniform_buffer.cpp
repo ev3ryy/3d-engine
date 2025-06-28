@@ -1,6 +1,6 @@
 #include "uniform_buffer.h"
 
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 UniformBuffer::UniformBuffer(VmaAllocator allocator, VkDeviceSize size)
 	: _allocator(allocator), bufferSize(size)

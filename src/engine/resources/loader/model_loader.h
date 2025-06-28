@@ -6,6 +6,8 @@
 #include <memory>
 #include <unordered_map>
 
+#include "../../scene/object/object.h"
+
 struct aiNode;
 struct aiScene;
 struct aiMesh;
@@ -14,19 +16,14 @@ struct aiMaterial;
 class Mesh;
 class Material;
 
-struct LoadedAssetData {
+struct ModelData {
+    std::unique_ptr<Object> rootObject;
     std::unordered_map<std::string, std::shared_ptr<Mesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Material>> materials;
 };
 
 namespace ModelLoader {
-    LoadedAssetData Load(const std::string& path);
-
-    namespace detail {
-        void ProcessNode(const std::string& modelPath, aiNode* node, const aiScene* scene, LoadedAssetData& assetData, size_t& meshCounter);
-        void ProcessMesh(const std::string& modelPath, aiMesh* mesh, const aiScene* scene, LoadedAssetData& assetData, size_t& meshCounter);
-        void ProcessMaterial(const std::string& modelPath, aiMaterial* material, unsigned int materialIndex, LoadedAssetData& assetData);
-    }
+    ModelData Load(const std::string& path);
 }
 
 #endif // MODEL_LOADER_H

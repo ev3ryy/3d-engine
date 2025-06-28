@@ -14,6 +14,10 @@ glm::mat4 transformComponent::getLocalMatrix() const
 
 glm::mat4 transformComponent::getWorldMatrix() const
 {
-    // @FIXME
-    return getLocalMatrix();
+    if (parent) {
+        return parent->getWorldMatrix() * getLocalMatrix();
+    }
+    else { // if we can`t have parent, local matrix - is global matrix
+        return getLocalMatrix();
+    }
 }
