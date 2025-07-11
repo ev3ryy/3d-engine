@@ -7,9 +7,11 @@
 #include <type_traits>
 #include <glm/glm.hpp>
 
+#include "../world/world.h"
 #include "component.h"
 #include "components/transform_component.h"
 #include "components/mesh_renderer_component.h"
+#include "components/rigidbody_component.h"
 
 class Object {
 public:
@@ -32,6 +34,12 @@ public:
 
 		if constexpr (std::is_same_v<T, transformComponent>) {
 			transform = ptr;
+		}
+
+		if constexpr (std::is_same_v<T, RigidBodyComponent>) {
+			if (m_world) {
+				ptr->setPhysicsFacade(m_world->getPhysicsFacade());
+			}
 		}
 
 		components.push_back(std::move(newComponent));
@@ -84,6 +92,7 @@ public:
 	Object* getParent() const { return parent; }
 
 	void setName(const std::string& newName);
+	void setWorld(World* world) { m_world = world; }
 
 	void addChild(std::unique_ptr<Object> child);
 	void removeChild(Object* child);
@@ -97,6 +106,8 @@ public:
 private:
 	std::string name;
 	int id;
+
+	World* m_world = nullptr;
 
 	Object* parent = nullptr;
 	std::vector<std::unique_ptr<Object>> children;

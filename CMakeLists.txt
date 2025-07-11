@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.14)
 if (DEFINED ENV{VCPKG_ROOT})
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 endif()
-
 project(MyEngine)
 
 message(STATUS "VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
@@ -15,12 +14,13 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
 
 find_package(Vulkan REQUIRED)
-find_package(Bullet CONFIG REQUIRED)
+# find_package(Bullet CONFIG REQUIRED)
 
 add_subdirectory(src/modules/core)
 add_subdirectory(src/modules/renderer)
 add_subdirectory(src/modules/input)
 add_subdirectory(src/modules/logger)
+add_subdirectory(src/modules/physics)
 
 file(GLOB IMGUI_SOURCES
     "${CMAKE_SOURCE_DIR}/include/imgui/*.cpp"

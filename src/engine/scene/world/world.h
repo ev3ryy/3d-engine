@@ -5,14 +5,15 @@
 #include <unordered_map>
 
 #include "../camera/camera.h"
-
 #include "../object/object.h"
+
+#include <physics/physics.h>
 
 class MeshRendererComponent;
 
 class World {
 public:
-	World();
+	World(Physics* physicsFacade);
 	~World() = default;
 
 	World(const World&) = delete;
@@ -48,6 +49,8 @@ public:
 	void clear();
 
 private:
+	Physics* m_physicsFacade;
+
 	std::vector<std::unique_ptr<Object>> objects;
 
 	// fast access
@@ -59,6 +62,7 @@ private:
 	void addObjectsToMapsRecursive(Object* obj);
 	void removeObjectsFromMapsRecursive(Object* obj);
 	void updateObjectRecursive(Object* obj, float deltaTime);
+	void synchronizeTransformsFromPhysics();
 };
 
 #endif // SCENE_WORLD_H

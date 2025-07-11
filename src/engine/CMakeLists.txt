@@ -20,6 +20,7 @@ target_include_directories(EngineRuntime PUBLIC
     ${CMAKE_SOURCE_DIR}/include/glfw/include
     ${CMAKE_SOURCE_DIR}/include/glm
     ${CMAKE_SOURCE_DIR}/include/assimp/include
+    ${CMAKE_SOURCE_DIR}/src/modules/physics/include
     ${Vulkan_INCLUDE_DIRS}
     "${PROJECT_SOURCE_DIR}/src/modules/core"
     "${PROJECT_SOURCE_DIR}/src/modules/logger"
@@ -35,6 +36,7 @@ target_link_libraries(EngineRuntime PUBLIC
     glfw
     Vulkan::Vulkan
     assimp
+    physics
 )
 
 target_compile_options(EngineRuntime PRIVATE /utf-8)

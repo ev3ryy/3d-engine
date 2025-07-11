@@ -1,8 +1,10 @@
 #include "world.h"
 
+#include "../object/components/rigidbody_component.h"
+
 #include <logs.h>
 
-World::World()
+World::World(Physics* physicsFacade) : m_physicsFacade(physicsFacade)
 {
 }
 
@@ -17,6 +19,7 @@ void World::addObject(std::unique_ptr<Object> obj)
 	}
 
 	addObjectsToMapsRecursive(obj.get());
+	obj->setWorld(this);
 	objects.push_back(std::move(obj));
 }
 
@@ -115,6 +118,34 @@ void World::update(float deltaTime)
 		if (obj_ptr) {
 			obj_ptr->update(deltaTime);
 		}
+	}
+
+	if (m_physicsFacade) {
+		// synchronizeTransformsToPhysics();
+
+		m_physicsFacade->update(deltaTime);
+
+		synchronizeTransformsFromPhysics();
+	}
+}
+
+void World::synchronizeTransformsFromPhysics() {
+	for (const auto& obj : objects) {
+
+		std::function<void(Object*)> syncFunc =
+			[&](Object* currentObj) {
+			if (auto* rb = currentObj->getComponent<RigidBodyComponent>()) {
+				if (auto* transform = currentObj->getTransform()) {
+
+					transform->position = m_physicsFacade->getPosition(rb->getBodyHandle());
+					// transform->rotation = m_physicsFacade->getRotation(rb->getBodyHandle());
+				}
+			}
+			for (const auto& child : currentObj->getChildren()) {
+				syncFunc(child.get());
+			}
+			};
+		syncFunc(obj.get());
 	}
 }
 

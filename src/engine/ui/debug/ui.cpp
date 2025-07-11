@@ -13,6 +13,7 @@
 #include "object/components/mesh_renderer_component.h"
 #include "object/components/camera_component.h"
 #include "object/components/script_component.h"
+#include "object/components/rigidbody_component.h"
 
 #include "mesh/mesh.h"
 #include "material/material.h"
@@ -240,6 +241,15 @@ namespace ui {
 		}
 
         ImGui::Separator();
+
+        if (RigidBodyComponent* rb = selectedObject->getComponent<RigidBodyComponent>()) {
+            ImGui::Text("Rigid Body");
+            ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.0f, 1000.0f);
+            ImGui::DragFloat("Sphere Radius", &rb->sphereRadius, 0.05f, 0.1f, 100.0f);
+            // TODO: ѕри изменении параметров нужно пересоздавать тело в физическом движке
+        }
+
+        ImGui::Separator();
         ImGui::Spacing();
 
         if (ImGui::Button("Add Component")) {
@@ -247,6 +257,16 @@ namespace ui {
         }
 
         if (ImGui::BeginPopup("AddComponentPopup")) {
+            ImGui::Text("Available Components");
+            ImGui::Separator();
+
+            if (ImGui::Selectable("Rigid Body")) {
+                if (!selectedObject->getComponent<RigidBodyComponent>()) {
+                    selectedObject->addComponent<RigidBodyComponent>();
+                }
+                ImGui::CloseCurrentPopup();
+            }
+
             ImGui::Text("Available Scripts");
             ImGui::Separator();
 

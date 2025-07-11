@@ -20,6 +20,8 @@
 
 #include <utils/keycodes.h>
 
+#include <physics/physics.h>
+
 #include <iostream>
 #include <filesystem>
 #include <sstream>
@@ -51,6 +53,7 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
     std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
     GLFWwindow* windowHandle)
 {
+    m_physicsFacade = std::make_unique<Physics>();
     world = std::make_unique<World>();
 
     auto cameraObj = world->createObject("MainCamera");

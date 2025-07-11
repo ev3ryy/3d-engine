@@ -13,6 +13,7 @@ class camera;
 class World;
 class ResourceManager;
 class IInputProvider;
+class Physics;
 
 struct GLFWwindow;
 
@@ -42,6 +43,7 @@ private:
     renderer* _renderer;
 
     std::unique_ptr<World> world;
+    std::unique_ptr<Physics> m_physicsFacade;
 
     int last_fb_width = 0, last_fb_height = 0;
 
