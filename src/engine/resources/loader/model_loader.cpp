@@ -35,14 +35,16 @@ namespace ModelLoader {
         std::unique_ptr<Object> ProcessNode(aiNode* node, const aiScene* scene, ModelData& modelData, const std::string& modelPath) {
             auto newObject = std::make_unique<Object>(node->mName.C_Str());
 
-            transformComponent* tc = newObject->getTransform();
+            TransformComponent* tc = newObject->getTransform();
             if (tc) {
                 glm::mat4 transform = AiMatrix4x4ToGlm(node->mTransformation);
                 glm::vec3 skew;
                 glm::vec4 perspective;
                 glm::quat rotationQuat;
+
                 glm::decompose(transform, tc->scale, rotationQuat, tc->position, skew, perspective);
-                tc->rotation = glm::degrees(glm::eulerAngles(rotationQuat));
+
+                tc->setRotation(rotationQuat);
             }
 
             for (unsigned int i = 0; i < node->mNumMeshes; i++) {

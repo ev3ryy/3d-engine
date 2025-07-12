@@ -14,6 +14,8 @@
 #include "object/components/camera_component.h"
 #include "object/components/script_component.h"
 #include "object/components/rigidbody_component.h"
+#include "object/components/box_component.h"
+#include "object/components/sphere_component.h"
 
 #include "mesh/mesh.h"
 #include "material/material.h"
@@ -189,12 +191,17 @@ namespace ui {
 
 		ImGui::Separator();
 
-		if (transformComponent* transform = selectedObject->getComponent<transformComponent>()) {
-			ImGui::Text("Transform");
-			ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
-			ImGui::DragFloat3("Rotation", &transform->rotation.x, 0.5f);
-			ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
-		}
+        if (TransformComponent* transform = selectedObject->getComponent<TransformComponent>()) {
+            ImGui::Text("Transform");
+            ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+
+            glm::vec3 eulerAngles = transform->getRotationEuler();
+            if (ImGui::DragFloat3("Rotation", &eulerAngles.x, 1.0f)) {
+                transform->setRotation(eulerAngles);
+            }
+
+            ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
+        }
 		else {
 			ImGui::Text("Object has no Transform Component.");
 		}
@@ -244,9 +251,18 @@ namespace ui {
 
         if (RigidBodyComponent* rb = selectedObject->getComponent<RigidBodyComponent>()) {
             ImGui::Text("Rigid Body");
-            ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.0f, 1000.0f);
-            ImGui::DragFloat("Sphere Radius", &rb->sphereRadius, 0.05f, 0.1f, 100.0f);
-            // TODO: ѕри изменении параметров нужно пересоздавать тело в физическом движке
+
+            if (ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.0f, 1000.0f)) {
+                rb->isDirty = true;
+            }
+
+            if (SphereComponent* sc = selectedObject->getComponent<SphereComponent>()) {
+                 float radius = sc->getRadius();
+                 if(ImGui::DragFloat("Sphere Radius", &radius, 0.05f)) {
+                    sc->setRadius(radius);
+                    rb->isDirty = true;
+                 }
+            }
         }
 
         ImGui::Separator();
@@ -263,12 +279,26 @@ namespace ui {
             if (ImGui::Selectable("Rigid Body")) {
                 if (!selectedObject->getComponent<RigidBodyComponent>()) {
                     selectedObject->addComponent<RigidBodyComponent>();
-                    selectedObject->getComponent<RigidBodyComponent>()->isDirty = true;
                 }
                 ImGui::CloseCurrentPopup();
             }
 
-            ImGui::Separator();
+            if (ImGui::Selectable("Box Collider")) {
+                if (!selectedObject->getComponent<ColliderComponent>()) {
+                    selectedObject->addComponent<BoxComponent>(glm::vec3(1, 1, 1));
+
+                    if (auto rb = selectedObject->getComponent<RigidBodyComponent>()) rb->isDirty = true;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::Selectable("Sphere Collider")) {
+                if (!selectedObject->getComponent<ColliderComponent>()) {
+                    selectedObject->addComponent<SphereComponent>(0.5f);
+                    if (auto rb = selectedObject->getComponent<RigidBodyComponent>()) rb->isDirty = true;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+
             ImGui::Spacing();
 
             ImGui::Text("Available Scripts");

@@ -3,21 +3,32 @@
 
 #include "../component.h"
 
-#include <variant>
+#include <btBulletCollisionCommon.h>
+
+#include <logs.h>
 
 class ColliderComponent : public component {
 public:
     static const bool isUnique = true;
 
-    std::variant<physics::SphereShape, physics::BoxShape, physics::CapsuleShape> shape;
+    ColliderComponent() {}
+    virtual ~ColliderComponent() {
+        if (m_Shape) {
+            LOG_INFO("ColliderComponent: Deleting btCollisionShape.");
+            delete m_Shape;
+            m_Shape = nullptr;
+        }
+        else {
+            LOG_WARN("ColliderComponent: Destructor called, but m_Shape was already null.");
+        }
+    }
 
-    ColliderComponent(const physics::SphereShape& s) : shape(s) {}
-    ColliderComponent(const physics::BoxShape& b) : shape(b) {}
-    ColliderComponent(const physics::CapsuleShape& c) : shape(c) {}
+    //void addedToObject() override;
 
-    ~ColliderComponent() override;
+    btCollisionShape* GetShape() { return m_Shape; }
 
-    void addedToObject() override;
+protected:
+    btCollisionShape* m_Shape = nullptr;
 };
 
 #endif // COLLIDER_COMPONENT_H

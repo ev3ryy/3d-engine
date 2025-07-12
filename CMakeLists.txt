@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
+add_subdirectory(${CMAKE_SOURCE_DIR}/include/bullet3 EXCLUDE_FROM_ALL)
 
 find_package(Vulkan REQUIRED)
 # find_package(Bullet CONFIG REQUIRED)
@@ -20,7 +21,6 @@ add_subdirectory(src/modules/core)
 add_subdirectory(src/modules/renderer)
 add_subdirectory(src/modules/input)
 add_subdirectory(src/modules/logger)
-add_subdirectory(src/modules/physics)
 
 file(GLOB IMGUI_SOURCES
     "${CMAKE_SOURCE_DIR}/include/imgui/*.cpp"

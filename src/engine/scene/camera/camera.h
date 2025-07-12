@@ -26,7 +26,8 @@ public:
         float yaw = -90.0f,
         float pitch = 0.0f)
         : position(startPosition), worldUp(up), yaw(yaw), pitch(pitch),
-        movementSpeed(2.5f), mouseSensitivity(0.1f), fov(60.0f)
+        movementSpeed(2.5f), mouseSensitivity(0.1f), fov(60.0f),
+        m_nearPlane(0.1f), m_farPlane(1000.0f)
     {
         updateCameraVectors();
     }
@@ -75,8 +76,8 @@ public:
             movementSpeed = value;
     }
 
-    float getNearPlane() const { return near; }
-    float getFarPlane() const { return far; }
+    float getNearPlane() const { return m_nearPlane; }
+    float getFarPlane() const { return m_farPlane; }
 
     glm::vec3 position;
     glm::vec3 front;
@@ -92,8 +93,8 @@ public:
 
     float fov;
 
-    float near = 0.1f;
-    float far = 1000.0f;
+    float m_nearPlane;
+    float m_farPlane;
 
 private:
     void updateCameraVectors() {

@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <memory>
 #include <stdexcept>
 
@@ -75,6 +75,19 @@ int main() {
         PerformanceStats stats = window::updatePerfomanceStats();
 
         ui::debug::drawDebugMenu(world, rendererInstance);
+
+        ImGui::Begin("Toolbar");
+        if (engine->getCurrentState() == EngineState::EDITING) {
+            if (ImGui::Button("Play (▶)")) {
+                engine->setState(EngineState::PLAYING);
+            }
+        }
+        else {
+            if (ImGui::Button("Stop (⏹️)")) {
+                engine->setState(EngineState::EDITING);
+            }
+        }
+        ImGui::End();
 
         ImGui::Render();
     };

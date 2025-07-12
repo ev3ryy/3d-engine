@@ -15,7 +15,7 @@ int Object::nextID;
 Object::Object(const std::string& name) : name(name)
 {
     id = nextID++;
-    addComponent<transformComponent>();
+    addComponent<TransformComponent>();
 
     canUpdate = true;
 }
@@ -69,8 +69,8 @@ void Object::addChild(std::unique_ptr<Object> child) {
 
     child->parent = this;
 
-    auto childTransform = child->getComponent<transformComponent>();
-    auto parentTransform = this->getComponent<transformComponent>();
+    auto childTransform = child->getComponent<TransformComponent>();
+    auto parentTransform = this->getComponent<TransformComponent>();
 
     if (childTransform && parentTransform) {
         childTransform->parent = parentTransform;
@@ -92,8 +92,8 @@ void Object::removeChild(Object* child) {
     if (it != children.end()) {
         if (child->parent == this) {
             child->parent = nullptr;
-            if (child->getComponent<transformComponent>()) {
-                child->getComponent<transformComponent>()->parent = nullptr;
+            if (child->getComponent<TransformComponent>()) {
+                child->getComponent<TransformComponent>()->parent = nullptr;
             }
         }
         children.erase(it, children.end());
@@ -112,8 +112,8 @@ std::unique_ptr<Object> Object::detachChild(Object* child) {
         children.erase(it);
 
         detachedChild->parent = nullptr;
-        if (detachedChild->getComponent<transformComponent>()) {
-            detachedChild->getComponent<transformComponent>()->parent = nullptr;
+        if (detachedChild->getComponent<TransformComponent>()) {
+            detachedChild->getComponent<TransformComponent>()->parent = nullptr;
         }
     }
     return detachedChild;
@@ -122,10 +122,10 @@ std::unique_ptr<Object> Object::detachChild(Object* child) {
 std::unique_ptr<Object> Object::deepCopy() const {
     auto newObject = std::make_unique<Object>(this->name);
 
-    if (const auto* sourceTransform = this->getComponent<transformComponent>()) {
-        auto* destTransform = newObject->getComponent<transformComponent>();
+    if (const auto* sourceTransform = this->getComponent<TransformComponent>()) {
+        auto* destTransform = newObject->getComponent<TransformComponent>();
         destTransform->position = sourceTransform->position;
-        destTransform->rotation = sourceTransform->rotation;
+        destTransform->rotation_quat = sourceTransform->rotation_quat;
         destTransform->scale = sourceTransform->scale;
     }
 

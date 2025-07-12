@@ -28,6 +28,8 @@ target_include_directories(renderer PUBLIC
 
     ${CMAKE_SOURCE_DIR}/include/VulkanMemoryAllocator/include
 
+    ${CMAKE_SOURCE_DIR}/include/bullet3/src
+
     ${Vulkan_INCLUDE_DIRS}
 )
 
@@ -36,4 +38,5 @@ target_link_libraries(renderer PUBLIC
     glfw
     logger
     Vulkan::Vulkan
+    BulletDynamics
 )

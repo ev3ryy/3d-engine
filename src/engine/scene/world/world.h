@@ -7,19 +7,13 @@
 #include <string>
 #include <type_traits>
 
-//#include "../camera/camera.h"
-//#include "../object/object.h"
-//
-//#include <physics/physics.h>
-
 class MeshRendererComponent;
 class Object;
 class Camera;
-class Physics;
 
 class World {
 public:
-	World(Physics* physicsFacade);
+	World();
 	~World();
 
 	World(const World&) = delete;
@@ -47,7 +41,6 @@ public:
 	Object* findObjectByID(int id);
 	Object* findObjectByName(const std::string& name);
 	const Camera& getActiveRenderCamera() const;
-	Physics* getPhysicsFacade() const { return m_physicsFacade; }
 
 	void setActiveRenderCamera(const Camera* cam);
 
@@ -57,8 +50,6 @@ public:
 	void clear();
 
 private:
-	Physics* m_physicsFacade;
-
 	std::vector<std::unique_ptr<Object>> objects;
 
 	// fast access
@@ -70,7 +61,6 @@ private:
 	void addObjectsToMapsRecursive(Object* obj);
 	void removeObjectsFromMapsRecursive(Object* obj);
 	void updateObjectRecursive(Object* obj, float deltaTime);
-	void synchronizeTransformsFromPhysics();
 };
 
 #endif // SCENE_WORLD_H

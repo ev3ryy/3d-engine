@@ -9,7 +9,7 @@
 #include <logs.h>
 
 void CameraComponent::update(float deltaTime) {
-    transformComponent* transform = getOwner()->getComponent<transformComponent>();
+    TransformComponent* transform = getOwner()->getComponent<TransformComponent>();
     if (!transform) return;
 
     camera.position = transform->position;

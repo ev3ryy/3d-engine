@@ -2,32 +2,62 @@
 #define RIGIDBODY_COMPONENT_H
 
 #include "../component.h"
-#include <physics/physics.h>
 #include <glm/glm.hpp>
+
+#include "../../physics/utils/motion_state.h"
+
+#include <logs.h>
+
+class PhysicsWorld;
+class btRigidBody;
 
 class RigidBodyComponent : public component {
 public:
     static const bool isUnique = true;
 
     float mass = 1.0f;
-    float sphereRadius = 0.5f;
 
-    RigidBodyComponent();
-    ~RigidBodyComponent() override;
+    bool isDirty = true;
+
+    RigidBodyComponent() {
+        m_prevPhysicsPosition = glm::vec3(0.0f);
+        m_prevPhysicsRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        LOG_INFO("RigidBodyComponent created (default constructor).");
+    }
+
+    ~RigidBodyComponent() override {
+        LOG_INFO("RigidBodyComponent destructor called for object: %s", getOwner()->getName().c_str());
+        if (m_PhysicsWorld) {
+            destroyBody(m_PhysicsWorld);
+        }
+        else {
+            LOG_WARN("RigidBodyComponent destructor: m_PhysicsWorld was null. Body not explicitly destroyed from world.");
+        }
+    }
 
     void update(float dt) override;
-
     void addedToObject() override;
 
-    void setPhysicsFacade(Physics* facade);
+    void initialize(PhysicsWorld* world);
+    void destroyBody(PhysicsWorld* world);
 
-    BodyHandle getBodyHandle() const { return m_bodyHandle; }
+    btRigidBody* GetBtRigidBody() { return m_BtRigidBody; }
 
-    bool isDirty = false;
+    glm::vec3 getCurrentPhysicsPosition() const;
+    glm::quat getCurrentPhysicsRotation() const;
+    glm::vec3 getPreviousPhysicsPosition() const;
+    glm::quat getPreviousPhysicsRotation() const;
+
+    void setPrevPhysicsPosition(glm::vec3 value) { m_prevPhysicsPosition = value; }
+    void setPrevPhysicsRotation(glm::quat value) { m_prevPhysicsRotation = value; }
 
 private:
-    Physics* m_physicsFacade = nullptr;
-    BodyHandle m_bodyHandle = -1;
+    btRigidBody* m_BtRigidBody = nullptr;
+    MotionState* m_MotionState = nullptr;
+    PhysicsWorld* m_PhysicsWorld = nullptr;
+
+    glm::vec3 m_prevPhysicsPosition;
+    glm::quat m_prevPhysicsRotation;
 };
 
 #endif // RIGIDBODY_COMPONENT_H

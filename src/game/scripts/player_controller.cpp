@@ -16,7 +16,7 @@ void PlayerController::OnCreate()
 {
 	LOG_INFO("[player controller] was created");
 
-	transform = GetComponent<transformComponent>();
+	transform = GetComponent<TransformComponent>();
 }
 
 void PlayerController::OnUpdate(float deltaTime)

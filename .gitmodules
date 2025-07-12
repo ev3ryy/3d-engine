@@ -19,3 +19,6 @@
 [submodule "include/spdlog"]
 	path = include/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "include/bullet3"]
+	path = include/bullet3
+	url = https://github.com/bulletphysics/bullet3.git

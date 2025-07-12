@@ -10,7 +10,6 @@
 #include "component.h"
 #include "components/transform_component.h"
 #include "components/mesh_renderer_component.h"
-//#include "components/rigidbody_component.h"
 
 class World;
 
@@ -33,15 +32,9 @@ public:
 		T* ptr = newComponent.get();
 		ptr->setOwner(this);
 
-		if constexpr (std::is_same_v<T, transformComponent>) {
+		if constexpr (std::is_same_v<T, TransformComponent>) {
 			transform = ptr;
 		}
-
-		//if constexpr (std::is_same_v<T, RigidBodyComponent>) {
-		//	if (m_world) {
-		//		ptr->setPhysicsFacade(m_world->getPhysicsFacade());
-		//	}
-		//}
 
 		components.push_back(std::move(newComponent));
 		ptr->addedToObject();
@@ -53,7 +46,7 @@ public:
 	T* getComponent() const {
 		static_assert(std::is_base_of<component, T>::value, "T must derive from Component class");
 
-		if constexpr (std::is_same_v<T, transformComponent>) {
+		if constexpr (std::is_same_v<T, TransformComponent>) {
 			return transform;
 		}
 
@@ -87,7 +80,7 @@ public:
 		return glm::mat4(1.0f);
 	}
 
-	transformComponent* getTransform() const { return transform; }
+	TransformComponent* getTransform() const { return transform; }
 
 	const std::vector<std::unique_ptr<Object>>& getChildren() const { return children; }
 	Object* getParent() const { return parent; }
@@ -115,7 +108,7 @@ private:
 	std::vector<std::unique_ptr<Object>> children;
 
 	std::vector<std::unique_ptr<component>> components;
-	transformComponent* transform = nullptr;
+	TransformComponent* transform = nullptr;
 };
 
 #endif // ENGINE_OBJECT_H

@@ -3,7 +3,7 @@
 
 #include "../game.h"
 
-class transformComponent;
+class TransformComponent;
 class Object;
 
 class PlayerController : public ScriptBase {
@@ -14,7 +14,7 @@ public:
     void OnUpdate(float deltaTime) override;
     void OnDestroy() override;
 
-    transformComponent* transform;
+    TransformComponent* transform;
 };
 
 #endif // PLAYER_CONTROLLER_H

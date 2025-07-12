@@ -3,13 +3,11 @@
 #include "../camera/camera.h"
 #include "../object/object.h"
 
-#include <physics/physics.h>
-
 #include "../object/components/rigidbody_component.h"
 
 #include <logs.h>
 
-World::World(Physics* physicsFacade) : m_physicsFacade(physicsFacade)
+World::World()
 {
 }
 
@@ -127,29 +125,6 @@ void World::update(float deltaTime)
 		}
 	}
 
-	if (m_physicsFacade) {
-		synchronizeTransformsFromPhysics();
-	}
-}
-
-void World::synchronizeTransformsFromPhysics() {
-	for (const auto& obj : objects) {
-
-		std::function<void(Object*)> syncFunc =
-			[&](Object* currentObj) {
-			if (auto* rb = currentObj->getComponent<RigidBodyComponent>()) {
-				if (auto* transform = currentObj->getTransform()) {
-
-					transform->position = m_physicsFacade->getPosition(rb->getBodyHandle());
-					// transform->rotation = m_physicsFacade->getRotation(rb->getBodyHandle());
-				}
-			}
-			for (const auto& child : currentObj->getChildren()) {
-				syncFunc(child.get());
-			}
-			};
-		syncFunc(obj.get());
-	}
 }
 
 void World::updateObjectRecursive(Object* obj, float deltaTime) {

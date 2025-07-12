@@ -3,6 +3,7 @@
 #include "ui/debug/ui.h"
 #include "scene/world/world.h"
 #include "scene/object/components/camera_component.h"
+#include "scene/object/components/rigidbody_component.h"
 
 #include "resources/manager/resource_manager.h"
 
@@ -20,7 +21,7 @@
 
 #include <utils/keycodes.h>
 
-#include <physics/physics.h>
+#include <physics/world/physics_world.h>
 
 #include <iostream>
 #include <filesystem>
@@ -49,12 +50,29 @@ float Engine::getDeltaTime() {
     return deltaTime;
 }
 
+void Engine::onStateChanged(EngineState newState)
+{
+    switch (newState) {
+    case EngineState::PLAYING:
+        LOG_INFO("Engine State: Transitioned to PLAYING. Initializing all RigidBodyComponents.");
+        for (auto& object : world->getAllObjects()) {
+            if (auto rb = object->getComponent<RigidBodyComponent>()) {
+                rb->initialize(physicsWorld.get());
+            }
+        }
+        break;
+    case EngineState::EDITING:
+        LOG_INFO("Engine State: Transitioned to EDITING.");
+        break;
+    }
+}
+
 bool Engine::run(std::function<void(float deltaTime, World&, renderer&, ResourceManager&)> editorUpdateCallback,
     std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
     GLFWwindow* windowHandle)
 {
-    m_physicsFacade = std::make_unique<Physics>();
-    world = std::make_unique<World>(m_physicsFacade.get());
+    world = std::make_unique<World>();
+    physicsWorld = std::make_unique<PhysicsWorld>();
 
     auto cameraObj = world->createObject("MainCamera");
     auto cameraComp = cameraObj->addComponent<CameraComponent>(
@@ -64,10 +82,20 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         0.0f                         // pitch
     );
 
+    world->setActiveRenderCamera(&cameraComp->camera);
+
     const float fixedTimeStep = 1.0f / 60.0f;
     float accumulator = 0.0f;
+    const int MAX_PHYSICS_STEPS = 5;
 
-    world->setActiveRenderCamera(&cameraComp->camera);
+    for (auto& object : world->getAllObjects()) {
+        if (auto rb = object->getComponent<RigidBodyComponent>()) {
+            rb->initialize(physicsWorld.get());
+
+            rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
+            rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
+        }
+    }
 
     while (!glfwWindowShouldClose(window::_window)) {
         float deltaTime = getDeltaTime();
@@ -76,13 +104,26 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         Input::update();
         glfwPollEvents();
 
-        while (accumulator >= fixedTimeStep) {
-            m_physicsFacade->update(fixedTimeStep);
+        switch (currentState) {
+        case EngineState::EDITING:
+            break;
+        case EngineState::PLAYING:
+            int steps = 0;
+            while (accumulator >= fixedTimeStep && steps < MAX_PHYSICS_STEPS) {
+                for (auto& object : world->getAllObjects()) {
+                    if (auto rb = object->getComponent<RigidBodyComponent>()) {
+                        rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
+                        rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
+                    }
+                }
 
-            // world->fixedUpdate(fixedTimeStep); 
-
-            accumulator -= fixedTimeStep;
+                physicsWorld->Update(fixedTimeStep);
+                accumulator -= fixedTimeStep;
+                steps++;
+            }
+            break;
         }
+
 
         world->update(deltaTime);
 
@@ -102,11 +143,19 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
             last_fb_height = fb_height;
         }
 
+        float alpha = 0.0f;
+        if (fixedTimeStep > 0) {
+            alpha = accumulator / fixedTimeStep;
+
+            if (alpha < 0.0f) alpha = 0.0f;
+            if (alpha > 1.0f) alpha = 1.0f;
+        }
+
         if (editorUpdateCallback) {
             editorUpdateCallback(deltaTime, *world.get(), *_renderer, ResourceManager::Get());
         }
 
-        _renderer->render(*world.get(), ResourceManager::Get());
+        _renderer->render(*world.get(), ResourceManager::Get(), alpha);
     }
 
     return false;

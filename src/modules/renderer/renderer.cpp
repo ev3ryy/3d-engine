@@ -7,6 +7,11 @@
 #include "../resources/manager/resource_manager.h"
 #include "object/components/transform_component.h"
 #include "object/components/mesh_renderer_component.h"
+#include "object/components/rigidbody_component.h"
+
+#include "../physics/utils/motion_state.h"
+
+#include <btBulletDynamicsCommon.h>
 
 #include "camera/camera.h"
 
@@ -33,7 +38,7 @@ void renderer::init() {
 	_pipeline = new pipeline();
 }
 
-void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, pipeline* pipeline) {
+void renderer::collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, pipeline* pipeline, float interpolationAlpha) {
 	if (!currentObject) {
 		return;
 	}
@@ -45,10 +50,30 @@ void collectRenderableObjectsRecursive(Object* currentObject, std::vector<Render
 		std::shared_ptr<Material> materialPtr = resourceManager.GetMaterial(materialID);
 
 		if (meshPtr && materialPtr) {
-
 			RenderObject renderObj;
 			renderObj.mesh = meshPtr.get();
-			renderObj.modelMatrix = currentObject->getWorldMatrix();
+
+
+			RigidBodyComponent* rb = currentObject->getComponent<RigidBodyComponent>();
+			if (rb && rb->GetBtRigidBody() && rb->GetBtRigidBody()->getMotionState()) {
+				glm::vec3 prevPos = rb->getPreviousPhysicsPosition();
+				glm::quat prevRot = rb->getPreviousPhysicsRotation();
+				glm::vec3 currentPos = rb->getCurrentPhysicsPosition();
+				glm::quat currentRot = rb->getCurrentPhysicsRotation();
+
+				glm::vec3 interpolatedPos = glm::mix(prevPos, currentPos, interpolationAlpha);
+				glm::quat interpolatedRot = glm::slerp(prevRot, currentRot, interpolationAlpha);
+
+				glm::mat4 model = glm::mat4(1.0f);
+				model = glm::translate(model, interpolatedPos);
+				model = model * glm::toMat4(interpolatedRot);
+
+				model = model * glm::scale(glm::mat4(1.0f), currentObject->getComponent<TransformComponent>()->getScale());
+				renderObj.modelMatrix = model;
+			}
+			else {
+				renderObj.modelMatrix = currentObject->getWorldMatrix();
+			}
 
 			MaterialInstance* materialInstance = pipeline->getOrCreateMaterialInstance(*materialPtr);
 			renderObj.material = materialInstance;
@@ -63,21 +88,21 @@ void collectRenderableObjectsRecursive(Object* currentObject, std::vector<Render
 	}
 
 	for (const auto& childPtr : currentObject->getChildren()) {
-		collectRenderableObjectsRecursive(childPtr.get(), renderObjects, resourceManager, pipeline);
+		collectRenderableObjectsRecursive(childPtr.get(), renderObjects, resourceManager, pipeline, interpolationAlpha);
 	}
 }
 
-void renderer::syncWithWorld(const World& world, ResourceManager& resourceManager)
+void renderer::syncWithWorld(const World& world, ResourceManager& resourceManager, float interpolationAlpha)
 {
 	_renderObjects.clear();
 
 	const auto& rootObjects = world.getAllObjects();
 	for (const auto& objPtr : rootObjects) {
-		collectRenderableObjectsRecursive(objPtr.get(), _renderObjects, resourceManager, _pipeline);
+		collectRenderableObjectsRecursive(objPtr.get(), _renderObjects, resourceManager, _pipeline, interpolationAlpha);
 	}
 }
 
-void renderer::render(const World& world, ResourceManager& resourceManager)
+void renderer::render(const World& world, ResourceManager& resourceManager, float alpha)
 {
 	if (!_pipeline || _pipeline->getDevice() == VK_NULL_HANDLE) {
 		LOG_ERROR("Renderer pipeline is not initialized!");
@@ -137,7 +162,7 @@ void renderer::render(const World& world, ResourceManager& resourceManager)
 	renderData.clearColor = clearColor;
 	renderData.imguiDrawData = ImGui::GetDrawData();
 
-	syncWithWorld(world, resourceManager);
+	syncWithWorld(world, resourceManager, alpha);
 
 	_pipeline->recordCommandBuffer(_pipeline->commandBuffers[currentFrameIndex], imageIndex, renderData, _renderObjects);
 
