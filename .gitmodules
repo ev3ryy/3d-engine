@@ -10,3 +10,12 @@
 [submodule "include/JoltPhysics"]
 	path = include/JoltPhysics
 	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "include/glfw"]
+	path = include/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "include/entt"]
+	path = include/entt
+	url = https://github.com/skypjack/entt.git
+[submodule "include/spdlog"]
+	path = include/spdlog
+	url = https://github.com/gabime/spdlog.git
