@@ -8,6 +8,8 @@
 #include "object/components/transform_component.h"
 #include "object/components/mesh_renderer_component.h"
 
+#include "camera/camera.h"
+
 #include <GLFW/glfw3.h>
 #include <logs.h>
 

@@ -11,7 +11,7 @@ entt::entity PhysicsWorld::createSphere(const glm::vec3& position, float radius,
     m_registry.emplace<TransformComponent>(entity, position);
     m_registry.emplace<SphereColliderComponent>(entity, radius);
 
-    auto& body = m_registry.emplace<RigidBodyComponent>(entity);
+    auto& body = m_registry.emplace<RigidBody>(entity);
     body.setMass(mass);
 
     if (body.inverseMass != 0.0f) {
@@ -26,9 +26,9 @@ entt::entity PhysicsWorld::createSphere(const glm::vec3& position, float radius,
 }
 
 void PhysicsWorld::step(float dt) {
-    auto view = m_registry.view<RigidBodyComponent>();
+    auto view = m_registry.view<RigidBody>();
     for (auto entity : view) {
-        auto& body = view.get<RigidBodyComponent>(entity);
+        auto& body = view.get<RigidBody>(entity);
         body.forceAccumulator = { 0.0f, 0.0f, 0.0f };
         body.torqueAccumulator = { 0.0f, 0.0f, 0.0f };
     }
@@ -43,9 +43,9 @@ void PhysicsWorld::step(float dt) {
 }
 
 void PhysicsWorld::applyForces() {
-    auto view = m_registry.view<RigidBodyComponent>();
+    auto view = m_registry.view<RigidBody>();
     for (auto entity : view) {
-        auto& body = view.get<RigidBodyComponent>(entity);
+        auto& body = view.get<RigidBody>(entity);
         if (body.inverseMass == 0.0f) {
             continue;
         }
@@ -54,8 +54,8 @@ void PhysicsWorld::applyForces() {
 }
 
 void PhysicsWorld::integrate(float dt) {
-    auto view = m_registry.view<TransformComponent, RigidBodyComponent>();
-    view.each([&](TransformComponent& transform, RigidBodyComponent& body) {
+    auto view = m_registry.view<TransformComponent, RigidBody>();
+    view.each([&](TransformComponent& transform, RigidBody& body) {
         if (body.inverseMass == 0.0f) {
             return;
         }
@@ -76,10 +76,10 @@ void PhysicsWorld::integrate(float dt) {
 
 void PhysicsWorld::detectCollisions() {
     m_contacts.clear();
-    auto view = m_registry.view<TransformComponent, RigidBodyComponent, SphereColliderComponent>();
+    auto view = m_registry.view<TransformComponent, RigidBody, SphereColliderComponent>();
 
-    view.each([&](const auto entityA, TransformComponent& transformA, RigidBodyComponent& bodyA, SphereColliderComponent& colliderA) {
-        view.each([&](const auto entityB, TransformComponent& transformB, RigidBodyComponent& bodyB, SphereColliderComponent& colliderB) {
+    view.each([&](const auto entityA, TransformComponent& transformA, RigidBody& bodyA, SphereColliderComponent& colliderA) {
+        view.each([&](const auto entityB, TransformComponent& transformB, RigidBody& bodyB, SphereColliderComponent& colliderB) {
             if (entityA >= entityB) {
                 return;
             }
@@ -108,9 +108,9 @@ void PhysicsWorld::detectCollisions() {
 void PhysicsWorld::resolveCollisions() {
     for (const auto& contact : m_contacts) {
         auto& transformA = m_registry.get<TransformComponent>(contact.bodyA);
-        auto& bodyA = m_registry.get<RigidBodyComponent>(contact.bodyA);
+        auto& bodyA = m_registry.get<RigidBody>(contact.bodyA);
         auto& transformB = m_registry.get<TransformComponent>(contact.bodyB);
-        auto& bodyB = m_registry.get<RigidBodyComponent>(contact.bodyB);
+        auto& bodyB = m_registry.get<RigidBody>(contact.bodyB);
 
         const float percent = 0.8f;
         const float slop = 0.01f;
@@ -150,13 +150,13 @@ void PhysicsWorld::setPosition(entt::entity entity, const glm::vec3& position) {
 
 void PhysicsWorld::applyForce(entt::entity entity, const glm::vec3& force) {
     if (m_registry.valid(entity)) {
-        m_registry.get<RigidBodyComponent>(entity).forceAccumulator += force;
+        m_registry.get<RigidBody>(entity).forceAccumulator += force;
     }
 }
 
 void PhysicsWorld::applyImpulse(entt::entity entity, const glm::vec3& impulse) {
     if (m_registry.valid(entity)) {
-        auto& body = m_registry.get<RigidBodyComponent>(entity);
+        auto& body = m_registry.get<RigidBody>(entity);
         if (body.inverseMass != 0.0f) {
             body.velocity += impulse * body.inverseMass;
         }

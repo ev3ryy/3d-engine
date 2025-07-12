@@ -10,7 +10,7 @@ struct TransformComponent {
     glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 };
 
-struct RigidBodyComponent {
+struct RigidBody {
     glm::vec3 velocity{ 0.0f };
     glm::vec3 forceAccumulator{ 0.0f };
 

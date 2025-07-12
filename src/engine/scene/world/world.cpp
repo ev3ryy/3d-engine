@@ -1,5 +1,10 @@
 #include "world.h"
 
+#include "../camera/camera.h"
+#include "../object/object.h"
+
+#include <physics/physics.h>
+
 #include "../object/components/rigidbody_component.h"
 
 #include <logs.h>
@@ -7,6 +12,8 @@
 World::World(Physics* physicsFacade) : m_physicsFacade(physicsFacade)
 {
 }
+
+World::~World() = default;
 
 void World::addObject(std::unique_ptr<Object> obj)
 {
@@ -121,10 +128,6 @@ void World::update(float deltaTime)
 	}
 
 	if (m_physicsFacade) {
-		// synchronizeTransformsToPhysics();
-
-		m_physicsFacade->update(deltaTime);
-
 		synchronizeTransformsFromPhysics();
 	}
 }

@@ -3,18 +3,24 @@
 
 #include <vector>
 #include <unordered_map>
+#include <memory>
+#include <string>
+#include <type_traits>
 
-#include "../camera/camera.h"
-#include "../object/object.h"
-
-#include <physics/physics.h>
+//#include "../camera/camera.h"
+//#include "../object/object.h"
+//
+//#include <physics/physics.h>
 
 class MeshRendererComponent;
+class Object;
+class Camera;
+class Physics;
 
 class World {
 public:
 	World(Physics* physicsFacade);
-	~World() = default;
+	~World();
 
 	World(const World&) = delete;
 	World& operator=(const World&) = delete;
@@ -27,9 +33,10 @@ public:
 
 	template<typename T = Object, typename... Args>
 	T* createObject(const std::string& name = "New Object", Args&&... args) {
-		static_assert(std::is_base_of<Object, T>::value, "T must derive from object");
+		static_assert(std::is_base_of<Object, T>::value, "T must derive from Object");
 		std::unique_ptr<T> newObj = std::make_unique<T>(name, std::forward<Args>(args)...);
 		T* ptr = newObj.get();
+		ptr->setWorld(this);
 
 		addObject(std::move(newObj));
 		return ptr;
@@ -40,6 +47,7 @@ public:
 	Object* findObjectByID(int id);
 	Object* findObjectByName(const std::string& name);
 	const Camera& getActiveRenderCamera() const;
+	Physics* getPhysicsFacade() const { return m_physicsFacade; }
 
 	void setActiveRenderCamera(const Camera* cam);
 

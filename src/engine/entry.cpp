@@ -54,7 +54,7 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
     GLFWwindow* windowHandle)
 {
     m_physicsFacade = std::make_unique<Physics>();
-    world = std::make_unique<World>();
+    world = std::make_unique<World>(m_physicsFacade.get());
 
     auto cameraObj = world->createObject("MainCamera");
     auto cameraComp = cameraObj->addComponent<CameraComponent>(
@@ -64,13 +64,25 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         0.0f                         // pitch
     );
 
+    const float fixedTimeStep = 1.0f / 60.0f;
+    float accumulator = 0.0f;
+
     world->setActiveRenderCamera(&cameraComp->camera);
 
     while (!glfwWindowShouldClose(window::_window)) {
         float deltaTime = getDeltaTime();
+        accumulator += deltaTime;
 
         Input::update();
         glfwPollEvents();
+
+        while (accumulator >= fixedTimeStep) {
+            m_physicsFacade->update(fixedTimeStep);
+
+            // world->fixedUpdate(fixedTimeStep); 
+
+            accumulator -= fixedTimeStep;
+        }
 
         world->update(deltaTime);
 

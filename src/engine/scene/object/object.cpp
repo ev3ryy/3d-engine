@@ -1,4 +1,8 @@
 #include "object.h"
+
+#include "../world/world.h"
+#include "components/rigidbody_component.h"
+
 #include <algorithm>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -47,6 +51,11 @@ int Object::getID() const
 
 void Object::setName(const std::string& newName) {
     name = newName;
+}
+
+void Object::setWorld(World* world)
+{
+    m_world = world;
 }
 
 void Object::addChild(std::unique_ptr<Object> child) {

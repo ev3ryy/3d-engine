@@ -1,5 +1,6 @@
 #include "rigidbody_component.h"
 #include "../object.h"
+#include "../../world/world.h"
 #include "transform_component.h"
 #include <stdexcept>
 
@@ -11,11 +12,27 @@ RigidBodyComponent::~RigidBodyComponent() {
     }
 }
 
+void RigidBodyComponent::update(float dt)
+{
+    if (isDirty) {
+        if (m_physicsFacade && m_bodyHandle != -1) {
+            m_physicsFacade->destroyBody(m_bodyHandle);
+        }
+
+        addedToObject();
+        isDirty = false;
+    }
+}
+
 void RigidBodyComponent::setPhysicsFacade(Physics* facade) {
     m_physicsFacade = facade;
 }
 
 void RigidBodyComponent::addedToObject() {
+    if (getOwner() && getOwner()->getWorld()) {
+        setPhysicsFacade(getOwner()->getWorld()->getPhysicsFacade());
+    }
+
     if (!m_physicsFacade) {
         throw std::runtime_error("Physics facade is not set for RigidBodyComponent!");
     }

@@ -263,9 +263,13 @@ namespace ui {
             if (ImGui::Selectable("Rigid Body")) {
                 if (!selectedObject->getComponent<RigidBodyComponent>()) {
                     selectedObject->addComponent<RigidBodyComponent>();
+                    selectedObject->getComponent<RigidBodyComponent>()->isDirty = true;
                 }
                 ImGui::CloseCurrentPopup();
             }
+
+            ImGui::Separator();
+            ImGui::Spacing();
 
             ImGui::Text("Available Scripts");
             ImGui::Separator();
@@ -293,7 +297,7 @@ namespace ui {
 	}
 
 	void drawAssetBrowser(World& world, renderer& renderer) {
-		static char modelPathBuffer[256] = "assets/models/sponza/sponza.obj";
+		static char modelPathBuffer[256] = "Chair.fbx";
 		static std::string selectedMeshID;
 
 		ImGui::Begin("Asset Browser");

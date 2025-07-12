@@ -5,8 +5,6 @@
 #include <physics/physics.h>
 #include <glm/glm.hpp>
 
-class Physics;
-
 class RigidBodyComponent : public component {
 public:
     static const bool isUnique = true;
@@ -17,11 +15,15 @@ public:
     RigidBodyComponent();
     ~RigidBodyComponent() override;
 
+    void update(float dt) override;
+
     void addedToObject() override;
 
     void setPhysicsFacade(Physics* facade);
 
     BodyHandle getBodyHandle() const { return m_bodyHandle; }
+
+    bool isDirty = false;
 
 private:
     Physics* m_physicsFacade = nullptr;
