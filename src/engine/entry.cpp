@@ -110,25 +110,31 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         Input::update();
         glfwPollEvents();
 
-        switch (currentState) {
-        case EngineState::EDITING:
-            break;
-        case EngineState::PLAYING:
-            int steps = 0;
-            while (accumulator >= fixedTimeStep && steps < MAX_PHYSICS_STEPS) {
-                for (auto& objectPtr : world->getAllObjects()) {
-                    Object* object = objectPtr.get();
-                    if (auto rb = object->getComponent<RigidBodyComponent>()) {
-                        rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
-                        rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
-                    }
-                }
+        bool physicsReady = physicsFuture.valid() &&
+            physicsFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
 
-                physicsWorld->Update(fixedTimeStep);
-                accumulator -= fixedTimeStep;
-                steps++;
-            }
-            break;
+        if (physicsReady) {
+            physicsFuture.get();
+        }
+
+        bool isPhysicsRunning = physicsFuture.valid() && !physicsReady;
+        if (!isPhysicsRunning && accumulator >= fixedTimeStep) {
+            physicsFuture = std::async(std::launch::async, [&]() {
+                switch (currentState) {
+                case EngineState::PLAYING:
+                    for (auto& objectPtr : world->getAllObjects()) {
+                        if (auto rb = objectPtr->getComponent<RigidBodyComponent>()) {
+                            rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
+                            rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
+                        }
+                    }
+                    physicsWorld->Update(fixedTimeStep);
+                    break;
+                default:
+                    break;
+                }
+                });
+            accumulator -= fixedTimeStep;
         }
 
         world->update(deltaTime);
@@ -162,6 +168,10 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         }
 
         _renderer->render(*world.get(), ResourceManager::Get(), alpha, physicsWorld.get());
+    }
+
+    if (physicsFuture.valid()) {
+        physicsFuture.wait();
     }
 
     return false;

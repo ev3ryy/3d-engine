@@ -5,6 +5,7 @@
 #include <memory>
 #include <chrono>
 #include <functional>
+#include <future>
 
 class core;
 class renderer;
@@ -49,6 +50,8 @@ private:
 
     std::unique_ptr<PhysicsWorld> physicsWorld;
     std::unique_ptr<World> world;
+
+    std::future<void> physicsFuture;
 
     int last_fb_width = 0, last_fb_height = 0;
 
