@@ -10,6 +10,7 @@ class Mesh;
 class MaterialInstance;
 class ResourceManager;
 class Object;
+class PhysicsWorld;
 
 struct RenderObject;
 
@@ -18,7 +19,7 @@ public:
 	renderer();
 	~renderer();
 
-	void render(const World& world, ResourceManager& resourceManager, float alpha);
+	void render(const World& world, ResourceManager& resourceManager, float alpha, PhysicsWorld* physicsWorld);
 	void waitDeviceIdle() const;
 
 	void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, pipeline* pipeline, float interpolationAlpha);

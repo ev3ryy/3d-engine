@@ -21,8 +21,8 @@ public:
         worldTrans.setOrigin(btVector3(pos.x, pos.y, pos.z));
         worldTrans.setRotation(btQuaternion(rot.x, rot.y, rot.z, rot.w));
 
-        LOG_INFO("MotionState::getWorldTransform - Object: %s, Position: (%.2f, %.2f, %.2f), Rotation: (%.2f, %.2f, %.2f, %.2f)",
-            m_Transform->getOwner()->getName().c_str(), pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, rot.w);
+        //LOG_INFO("MotionState::getWorldTransform - Object: %s, Position: (%.2f, %.2f, %.2f), Rotation: (%.2f, %.2f, %.2f, %.2f)",
+        //    m_Transform->getOwner()->getName().c_str(), pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, rot.w);
     }
 
     void setWorldTransform(const btTransform& worldTrans) override {
@@ -32,8 +32,8 @@ public:
         m_Transform->setPosition(glm::vec3(pos.x(), pos.y(), pos.z()));
         m_Transform->setRotation(glm::quat(rot.w(), rot.x(), rot.y(), rot.z()));
 
-        LOG_INFO("MotionState::setWorldTransform - Object: %s, Bullet Pos: (%.2f, %.2f, %.2f), Bullet Rot: (%.2f, %.2f, %.2f, %.2f)",
-            m_Transform->getOwner()->getName().c_str(), pos.x(), pos.y(), pos.z(), rot.x(), rot.y(), rot.z(), rot.w());
+        //LOG_INFO("MotionState::setWorldTransform - Object: %s, Bullet Pos: (%.2f, %.2f, %.2f), Bullet Rot: (%.2f, %.2f, %.2f, %.2f)",
+        //    m_Transform->getOwner()->getName().c_str(), pos.x(), pos.y(), pos.z(), rot.x(), rot.y(), rot.z(), rot.w());
     }
 
 private:

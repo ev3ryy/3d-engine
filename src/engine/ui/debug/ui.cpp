@@ -57,8 +57,8 @@ namespace ui {
 		initInfo.Queue = _renderer.getPipeline()->getGraphicsQueue();
 		initInfo.PipelineCache = VK_NULL_HANDLE;
 		initInfo.DescriptorPool = _renderer.getPipeline()->getDescriptorPool();
-		initInfo.RenderPass = _renderer.getPipeline()->getLightingRenderPass();
-		initInfo.Subpass = 0;
+		initInfo.RenderPass = _renderer.getPipeline()->getFinalRenderPass();
+		initInfo.Subpass = 2;
 		initInfo.MinImageCount = _renderer.getPipeline()->getMinImageCount();
 		initInfo.ImageCount = _renderer.getPipeline()->getImageCount();
 		initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -260,8 +260,19 @@ namespace ui {
                  float radius = sc->getRadius();
                  if(ImGui::DragFloat("Sphere Radius", &radius, 0.05f)) {
                     sc->setRadius(radius);
-                    rb->isDirty = true;
                  }
+            }
+
+            if (BoxComponent* bc = selectedObject->getComponent<BoxComponent>()) {
+                glm::vec3 halfExtents = bc->getHalfExtents();
+                if (ImGui::DragFloat3("Box Half Extents", &halfExtents.x, 0.05f, 0.01f, 100.0f)) {
+                    bc->setHalfExtents(halfExtents);
+                }
+            }
+
+            bool showDebug = rb->showColliderDebug;
+            if (ImGui::Checkbox("Show Collider Debug", &showDebug)) {
+                rb->showColliderDebug = showDebug;
             }
         }
 

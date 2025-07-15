@@ -4,7 +4,11 @@
 #include <btBulletDynamicsCommon.h>
 #include <vector>
 
+#include <memory>
+
 class RigidBodyComponent;
+class BulletDebugDrawer;
+class Object;
 
 class PhysicsWorld {
 public:
@@ -18,6 +22,11 @@ public:
 
     btDiscreteDynamicsWorld* GetWorld() { return m_DynamicsWorld; }
 
+    BulletDebugDrawer* getDebugDrawer() const { return drawer.get(); }
+
+    void debugDrawObjectCollider(btRigidBody* body);
+    void debugDrawAllEnabledColliders(const std::vector<Object*>& allObjects);
+
 private:
     btDefaultCollisionConfiguration* m_CollisionConfiguration;
     btCollisionDispatcher* m_Dispatcher;
@@ -26,6 +35,8 @@ private:
     btDiscreteDynamicsWorld* m_DynamicsWorld;
 
     std::vector<RigidBodyComponent*> m_RigidBodies;
+
+    std::unique_ptr<BulletDebugDrawer> drawer;
 };
 
 #endif // PHYSICS_WORLD_H

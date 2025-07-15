@@ -11,14 +11,29 @@ void RigidBodyComponent::addedToObject() {
 
 void RigidBodyComponent::update(float dt) {
     if (isDirty && m_PhysicsWorld) {
-        LOG_WARN("RigidBodyComponent::update - Object %s is dirty, re-initializing.", getOwner()->getName().c_str());
-        initialize(m_PhysicsWorld);
+        LOG_WARN("RigidBodyComponent::update - Object %s is dirty, applying changes to physics body.", getOwner()->getName().c_str());
+        if (!m_BtRigidBody) {
+            initialize(m_PhysicsWorld);
+        }
+        else {
+            updatePhysicsProperties();
+        }
         isDirty = false;
     }
 
     if (m_BtRigidBody && m_BtRigidBody->getMotionState()) {
         btTransform trans;
         m_BtRigidBody->getMotionState()->getWorldTransform(trans);
+
+        TransformComponent* transform = getOwner()->getComponent<TransformComponent>();
+        if (transform) {
+            transform->position.x = trans.getOrigin().getX();
+            transform->position.y = trans.getOrigin().getY();
+            transform->position.z = trans.getOrigin().getZ();
+
+            btQuaternion rot = trans.getRotation();
+            transform->setRotation(glm::quat(rot.getW(), rot.getX(), rot.getY(), rot.getZ()));
+        }
     }
 }
 
@@ -41,27 +56,26 @@ void RigidBodyComponent::initialize(PhysicsWorld* world) {
         return;
     }
 
-    m_MotionState = new MotionState(transform);
-    LOG_WARN("RigidBodyComponent::initialize - MotionState created.");
-
-    btCollisionShape* shape = collider->GetShape();
-    if (!shape) {
-        LOG_ERROR("RigidBodyComponent::initialize - ColliderComponent on object %s has a null shape. Cannot create RigidBody.", getOwner()->getName().c_str());
-        delete m_MotionState; m_MotionState = nullptr;
+    m_CollisionShape = collider->createBulletShape();
+    if (!m_CollisionShape) {
+        LOG_ERROR("RigidBodyComponent::initialize - ColliderComponent on object %s returned a null shape. Cannot create RigidBody.", getOwner()->getName().c_str());
         m_PhysicsWorld = nullptr;
         return;
     }
 
+    m_MotionState = new MotionState(transform);
+    LOG_WARN("RigidBodyComponent::initialize - MotionState created.");
+
     btVector3 localInertia(0, 0, 0);
     if (mass != 0.0f) {
-        shape->calculateLocalInertia(mass, localInertia);
+        m_CollisionShape->calculateLocalInertia(mass, localInertia);
         LOG_WARN("RigidBodyComponent::initialize - Calculated local inertia for mass %.2f: (%.2f, %.2f, %.2f)", mass, localInertia.x(), localInertia.y(), localInertia.z());
     }
     else {
         LOG_INFO("RigidBodyComponent::initialize - Mass is 0.0f, creating a static/kinematic body.");
     }
 
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, m_MotionState, shape, localInertia);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, m_MotionState, m_CollisionShape, localInertia);
     m_BtRigidBody = new btRigidBody(rbInfo);
 
 #ifdef _DEBUG
@@ -83,9 +97,6 @@ void RigidBodyComponent::destroyBody(PhysicsWorld* world) {
             delete m_MotionState;
             m_MotionState = nullptr;
         }
-        else {
-            LOG_WARN("RigidBodyComponent::destroyBody - MotionState was already null during destroyBody.");
-        }
 
         LOG_WARN("RigidBodyComponent::destroyBody - Deleting btRigidBody.");
         delete m_BtRigidBody;
@@ -95,6 +106,63 @@ void RigidBodyComponent::destroyBody(PhysicsWorld* world) {
     else {
         LOG_WARN("RigidBodyComponent::destroyBody - No btRigidBody to destroy for object: %s.", getOwner()->getName().c_str());
     }
+
+    if (m_CollisionShape) {
+        LOG_WARN("RigidBodyComponent::destroyBody - Deleting btCollisionShape.");
+        delete m_CollisionShape;
+        m_CollisionShape = nullptr;
+    }
+}
+
+void RigidBodyComponent::updatePhysicsProperties()
+{
+    if (!m_BtRigidBody || !getOwner() || !m_PhysicsWorld) {
+        LOG_ERROR("RigidBodyComponent::updatePhysicsProperties called with invalid state. Body, owner or physics world is null.");
+        return;
+    }
+
+    ColliderComponent* collider = getOwner()->getComponent<ColliderComponent>();
+    if (!collider) {
+        LOG_ERROR("RigidBodyComponent::updatePhysicsProperties - No ColliderComponent found on object %s.", getOwner()->getName().c_str());
+        return;
+    }
+
+    btCollisionShape* newShape = collider->createBulletShape();
+    if (!newShape) {
+        LOG_ERROR("RigidBodyComponent::updatePhysicsProperties - ColliderComponent on object %s returned a null shape. Cannot update RigidBody.", getOwner()->getName().c_str());
+        return;
+    }
+
+    if (m_CollisionShape) {
+        LOG_INFO("RigidBodyComponent::updatePhysicsProperties - Deleting old btCollisionShape.");
+        delete m_CollisionShape;
+    }
+    m_CollisionShape = newShape;
+
+    LOG_INFO("RigidBodyComponent::updatePhysicsProperties - Updating collision shape for object: %s.", getOwner()->getName().c_str());
+    m_BtRigidBody->setCollisionShape(m_CollisionShape);
+
+
+    btVector3 localInertia(0, 0, 0);
+    if (mass != 0.0f) {
+        m_CollisionShape->calculateLocalInertia(mass, localInertia);
+        LOG_INFO("RigidBodyComponent::updatePhysicsProperties - Recalculated local inertia for mass %.2f: (%.2f, %.2f, %.2f)", mass, localInertia.x(), localInertia.y(), localInertia.z());
+    }
+    else {
+        LOG_INFO("RigidBodyComponent::updatePhysicsProperties - Mass is 0.0f, body will be static/kinematic.");
+    }
+    m_BtRigidBody->setMassProps(mass, localInertia);
+    m_BtRigidBody->updateInertiaTensor();
+
+    if (mass > 0.0f && (m_BtRigidBody->getCollisionFlags() & btCollisionObject::CF_STATIC_OBJECT)) {
+        m_BtRigidBody->setCollisionFlags(m_BtRigidBody->getCollisionFlags() & ~btCollisionObject::CF_STATIC_OBJECT);
+    }
+    else if (mass == 0.0f && !(m_BtRigidBody->getCollisionFlags() & btCollisionObject::CF_STATIC_OBJECT)) {
+        m_BtRigidBody->setCollisionFlags(m_BtRigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
+    }
+
+    m_BtRigidBody->activate(true);
+    LOG_INFO("RigidBodyComponent::updatePhysicsProperties - Physics properties updated for object: %s.", getOwner()->getName().c_str());
 }
 
 glm::vec3 RigidBodyComponent::getCurrentPhysicsPosition() const {

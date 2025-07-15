@@ -26,6 +26,8 @@
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+struct DebugLineVertex;
+
 struct PushConstantData {
     glm::mat4 model;
 };
@@ -67,18 +69,22 @@ public:
 
     MaterialInstance* getOrCreateMaterialInstance(Material& material);
 
+    void createWireframeBuffers(const std::vector<DebugLineVertex>& vertices, const std::vector<uint32_t>& indices);
+
     VkInstance                      getInstance() const { return instance; }
     VkPhysicalDevice                getPhysicalDevice() const { return physicalDevice; }
     VkDevice                        getDevice() const { return device; }
     VkQueue                         getGraphicsQueue() const { return graphicsQueue; }
     VkQueue                         getPresentQueue() const { return presentQueue; }
     uint32_t                        getQueueFamily() const { return queueFamily; }
-    VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
+    //VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
+    //VkRenderPass                    getImGuiRenderPass() const { return imguiRenderPass; }
+    VkRenderPass                    getFinalRenderPass() const { return finalRenderPass; }
     VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
     uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
     uint32_t                        getImageCount() const { return _swapchain->imageCount; }
     uint32_t                        getCurrentFrame() const { return currentFrame; }
-    VkImageView                     getDepthImageView() const { return depthImageView; };
+    VkImageView                     getSwapchainDepthImageView() const { return swapchainDepthImageView; };
     std::vector<VkDescriptorSet>    getDescriptorSets() const { return descriptorSets; }
 
     void                            setCurrentFrame(uint32_t currentFrame) { currentFrame = currentFrame; }
@@ -118,10 +124,18 @@ private:
         VkImage& image, VkDeviceMemory& imageMemory);
     VkFormat findDepthFormat();
     void createDepthResources();
-    void createRenderPass();
-    void createLightingRenderPass();
+
+    void createGBufferRenderPass();
+    //void createLightingRenderPass();
+    //void createWireframeRenderPass();
+    //void createImGuiRenderPass();
+
+    void createFinalRenderPass();
+
     void createGBufferPipeline();
     void createLightingPipeline();
+    void createWireframePipeline();
+
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
     void createCommandPool();
@@ -143,6 +157,10 @@ private:
 
     void createGBufferResources();
     void createGBufferSampler();
+
+    void createSwapchainDepthResources();
+
+    void destroyWireframeBuffers();
 
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -192,15 +210,32 @@ private:
 
     buffers::vertexBuffer* _vertexBuffer;
     buffers::indexBuffer* _indexBuffer;
+
+    VkBuffer wireframeVertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory wireframeVertexMemory = VK_NULL_HANDLE;
+    VkBuffer wireframeIndexBuffer = VK_NULL_HANDLE; 
+    VkDeviceMemory wireframeIndexMemory = VK_NULL_HANDLE;
+
+    uint32_t wireframeVertexCount = 0;
+    uint32_t wireframeIndexCount = 0;
+
     swapchain* _swapchain;
 
     VmaAllocator allocator;
 
     PushConstantData pushData;
 
-    VkImage depthImage;
-    VkImageView depthImageView;
-    VkDeviceMemory depthImageMemory;
+    //VkImage depthImage;
+    //VkImageView depthImageView;
+    //VkDeviceMemory depthImageMemory;
+
+    VkImage gBufferDepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory gBufferDepthImageMemory = VK_NULL_HANDLE;
+    VkImageView gBufferDepthImageView = VK_NULL_HANDLE;
+
+    VkImage swapchainDepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory swapchainDepthImageMemory = VK_NULL_HANDLE;
+    VkImageView swapchainDepthImageView = VK_NULL_HANDLE;
 
     std::unordered_map<std::string, std::unique_ptr<MaterialInstance>> materialCache;
 
@@ -220,14 +255,20 @@ private:
     VkFramebuffer gBufferFramebuffer;
 
     VkRenderPass gBufferRenderPass;
+    //VkRenderPass lightingRenderPass;
+    //VkRenderPass wireframeRenderPass;
+    //VkRenderPass imguiRenderPass;
 
-    VkRenderPass lightingRenderPass;
+    VkRenderPass finalRenderPass;
 
     VkPipeline gBufferPipeline;
     VkPipelineLayout gBufferPipelineLayout;
 
     VkPipeline lightingPipeline;
     VkPipelineLayout lightingPipelineLayout;
+
+    VkPipeline wireframePipeline;
+    VkPipelineLayout wireframePipelineLayout;
 
     VkSampler gBufferSampler;
     VkDescriptorSetLayout gBufferDescriptorSetLayout;
@@ -253,6 +294,7 @@ private:
     VmaAllocation defaultAoImageAllocation = nullptr;
     VkImageView defaultAoImageView = VK_NULL_HANDLE;
     VkSampler defaultAoSampler = VK_NULL_HANDLE;
+
 
     void createDefaultTextures();
     void cleanupDefaultTextures();

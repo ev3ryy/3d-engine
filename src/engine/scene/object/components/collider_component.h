@@ -23,7 +23,7 @@ public:
         }
     }
 
-    //void addedToObject() override;
+    virtual btCollisionShape* createBulletShape() const = 0;
 
     btCollisionShape* GetShape() { return m_Shape; }
 

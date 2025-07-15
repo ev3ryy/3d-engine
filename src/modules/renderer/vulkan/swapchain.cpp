@@ -92,7 +92,6 @@ void swapchain::recreateSwapChain(VkRenderPass renderPass, VkImageView depthImag
     createFramebuffers(renderPass, depthImageView);
 }
 
-
 void swapchain::cleanupSwapChain()
 {
     for (auto framebuffer : swapChainFramebuffers) {

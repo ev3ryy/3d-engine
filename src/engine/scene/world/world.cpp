@@ -44,6 +44,16 @@ const std::vector<std::unique_ptr<Object>>& World::getAllObjects() const
 	return objects;
 }
 
+std::vector<Object*> World::getAllRawObjects() const
+{
+	std::vector<Object*> rawPtrs;
+	rawPtrs.reserve(objects.size());
+	for (const auto& objPtr : objects) {
+		rawPtrs.push_back(objPtr.get());
+	}
+	return rawPtrs;
+}
+
 void World::addObjectsToMapsRecursive(Object* obj)
 {
 	if (!obj) return;

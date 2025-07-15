@@ -22,8 +22,19 @@ public:
             }
             m_Shape = new btSphereShape(radius);
             LOG_INFO("SphereComponent radius changed to %.2f. New btSphereShape created.", radius);
+
+            if (getOwner()) {
+                if (RigidBodyComponent* rb = getOwner()->getComponent<RigidBodyComponent>()) {
+                    rb->isDirty = true;
+                }
+            }
         }
     }
+
+    btCollisionShape* createBulletShape() const override {
+        return new btSphereShape(radius);
+    }
+
 private:
     float radius = 1.0f;
 };

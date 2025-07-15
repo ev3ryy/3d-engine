@@ -88,12 +88,18 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
     float accumulator = 0.0f;
     const int MAX_PHYSICS_STEPS = 5;
 
-    for (auto& object : world->getAllObjects()) {
-        if (auto rb = object->getComponent<RigidBodyComponent>()) {
-            rb->initialize(physicsWorld.get());
-
-            rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
-            rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
+    for (auto& objectPtr : world->getAllObjects()) {
+        Object* object = objectPtr.get();
+        if (RigidBodyComponent* rb = object->getComponent<RigidBodyComponent>()) {
+            if (rb->isDirty) {
+                if (rb->GetBtRigidBody() == nullptr) {
+                    rb->initialize(physicsWorld.get());
+                }
+                else {
+                    rb->updatePhysicsProperties();
+                }
+                rb->isDirty = false;
+            }
         }
     }
 
@@ -110,7 +116,8 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         case EngineState::PLAYING:
             int steps = 0;
             while (accumulator >= fixedTimeStep && steps < MAX_PHYSICS_STEPS) {
-                for (auto& object : world->getAllObjects()) {
+                for (auto& objectPtr : world->getAllObjects()) {
+                    Object* object = objectPtr.get();
                     if (auto rb = object->getComponent<RigidBodyComponent>()) {
                         rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
                         rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
@@ -123,7 +130,6 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
             }
             break;
         }
-
 
         world->update(deltaTime);
 
@@ -155,7 +161,7 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
             editorUpdateCallback(deltaTime, *world.get(), *_renderer, ResourceManager::Get());
         }
 
-        _renderer->render(*world.get(), ResourceManager::Get(), alpha);
+        _renderer->render(*world.get(), ResourceManager::Get(), alpha, physicsWorld.get());
     }
 
     return false;

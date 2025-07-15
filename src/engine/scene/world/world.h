@@ -37,6 +37,7 @@ public:
 	}
 
 	const std::vector<std::unique_ptr<Object>>& getAllObjects() const;
+	std::vector<Object*> getAllRawObjects() const;
 
 	Object* findObjectByID(int id);
 	Object* findObjectByName(const std::string& name);
