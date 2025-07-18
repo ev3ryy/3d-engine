@@ -21,27 +21,30 @@ public:
 	~swapchain();
 
     void createSwapChain();
-    void recreateSwapChain(VkRenderPass renderPass, VkImageView depthImageView);
+    void recreateSwapChain();
     void cleanupSwapChain();
 
     void createImageViews();
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
+    static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 
-    void createFramebuffers(VkRenderPass renderPass, VkImageView depthImageView);
+    /*void createFramebuffers(VkRenderPass renderPass, VkImageView depthImageView);*/
 
-    VkFramebuffer getSwapchainFramebuffer(uint32_t imageIndex) const {
-        if (imageIndex >= swapChainFramebuffers.size()) {
-            throw std::runtime_error("lol");
-        }
-        return swapChainFramebuffers[imageIndex];
-    }
+    VkImage getImage(uint32_t index) const;
+    VkImageView getImageView(uint32_t index) const;
 
-    std::vector<VkFramebuffer> getSwapchainFramebuffer() const { return swapChainFramebuffers; }
+    //VkFramebuffer getSwapchainFramebuffer(uint32_t imageIndex) const {
+    //    if (imageIndex >= swapChainFramebuffers.size()) {
+    //        throw std::runtime_error("lol");
+    //    }
+    //    return swapChainFramebuffers[imageIndex];
+    //}
+
+    //std::vector<VkFramebuffer> getSwapchainFramebuffer() const { return swapChainFramebuffers; }
 
     VkSwapchainKHR swapChain;
     std::vector<VkImage> swapChainImages;
@@ -53,7 +56,7 @@ public:
     uint32_t imageCount;
 
 private:
-    std::vector<VkFramebuffer> swapChainFramebuffers;
+    //std::vector<VkFramebuffer> swapChainFramebuffers;
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;

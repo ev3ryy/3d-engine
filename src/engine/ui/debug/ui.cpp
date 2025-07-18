@@ -49,21 +49,19 @@ namespace ui {
 		ImGui::StyleColorsDark();
 
 		ImGui_ImplGlfw_InitForVulkan(window::_window, false);
-		ImGui_ImplVulkan_InitInfo initInfo{};
-		initInfo.Instance = _renderer.getPipeline()->getInstance();
-		initInfo.PhysicalDevice = _renderer.getPipeline()->getPhysicalDevice();
-		initInfo.Device = _renderer.getPipeline()->getDevice();
-		initInfo.QueueFamily = _renderer.getPipeline()->getQueueFamily();
-		initInfo.Queue = _renderer.getPipeline()->getGraphicsQueue();
-		initInfo.PipelineCache = VK_NULL_HANDLE;
-		initInfo.DescriptorPool = _renderer.getPipeline()->getDescriptorPool();
-		initInfo.RenderPass = _renderer.getPipeline()->getFinalRenderPass();
-		initInfo.Subpass = 2;
-		initInfo.MinImageCount = _renderer.getPipeline()->getMinImageCount();
-		initInfo.ImageCount = _renderer.getPipeline()->getImageCount();
-		initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-		initInfo.Allocator = nullptr;
-		initInfo.CheckVkResultFn = check_vk_result;
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance = _renderer.getPipeline()->getInstance();
+        initInfo.PhysicalDevice = _renderer.getPipeline()->getPhysicalDevice();
+        initInfo.Device = _renderer.getPipeline()->getDevice();
+        initInfo.QueueFamily = _renderer.getPipeline()->getQueueFamily();
+        initInfo.Queue = _renderer.getPipeline()->getGraphicsQueue();
+        initInfo.DescriptorPool = _renderer.getPipeline()->getDescriptorPool();
+        initInfo.MinImageCount = _renderer.getPipeline()->getMinImageCount();
+        initInfo.ImageCount = _renderer.getPipeline()->getImageCount();
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.UseDynamicRendering = true;
+        initInfo.RenderPass = VK_NULL_HANDLE;
+
 		ImGui_ImplVulkan_Init(&initInfo);
 	}
 

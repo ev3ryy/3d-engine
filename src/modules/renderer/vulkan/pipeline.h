@@ -79,7 +79,7 @@ public:
     uint32_t                        getQueueFamily() const { return queueFamily; }
     //VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
     //VkRenderPass                    getImGuiRenderPass() const { return imguiRenderPass; }
-    VkRenderPass                    getFinalRenderPass() const { return finalRenderPass; }
+    //VkRenderPass                    getFinalRenderPass() const { return finalRenderPass; }
     VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
     uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
     uint32_t                        getImageCount() const { return _swapchain->imageCount; }
@@ -125,12 +125,12 @@ private:
     VkFormat findDepthFormat();
     void createDepthResources();
 
-    void createGBufferRenderPass();
+    //void createGBufferRenderPass();
     //void createLightingRenderPass();
     //void createWireframeRenderPass();
     //void createImGuiRenderPass();
 
-    void createFinalRenderPass();
+    //void createFinalRenderPass();
 
     void createGBufferPipeline();
     void createLightingPipeline();
@@ -151,7 +151,7 @@ private:
     void createGlobalDescriptorSet();
     void createMaterialDescriptorPool();
 
-    void createGBufferFramebuffer();
+    //void createGBufferFramebuffer();
     void createGBufferDescriptorSetLayout();
     void createGBufferDescriptorSet();
 
@@ -205,7 +205,11 @@ private:
     size_t currentInstanceCapacity = 100;
 
     const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+        VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
     };
 
     buffers::vertexBuffer* _vertexBuffer;
@@ -252,14 +256,11 @@ private:
         VkImageView emissiveView;
     } gBuffer;
 
-    VkFramebuffer gBufferFramebuffer;
+    //VkFramebuffer gBufferFramebuffer;
 
-    VkRenderPass gBufferRenderPass;
-    //VkRenderPass lightingRenderPass;
-    //VkRenderPass wireframeRenderPass;
-    //VkRenderPass imguiRenderPass;
+    //VkRenderPass gBufferRenderPass;
 
-    VkRenderPass finalRenderPass;
+    //VkRenderPass finalRenderPass;
 
     VkPipeline gBufferPipeline;
     VkPipelineLayout gBufferPipelineLayout;

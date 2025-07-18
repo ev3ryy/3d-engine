@@ -128,7 +128,7 @@ void renderer::render(const World& world, ResourceManager& resourceManager, floa
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		window::framebufferResized = false;
-		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getFinalRenderPass(), _pipeline->getSwapchainDepthImageView());
+		_pipeline->getSwapchain()->recreateSwapChain();
 		return;
 	}
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -212,7 +212,7 @@ void renderer::render(const World& world, ResourceManager& resourceManager, floa
 	bool framebufferResized = window::framebufferResized;
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
 		window::framebufferResized = false;
-		_pipeline->getSwapchain()->recreateSwapChain(_pipeline->getFinalRenderPass(), _pipeline->getSwapchainDepthImageView());
+		_pipeline->getSwapchain()->recreateSwapChain();
 	}
 	else if (result != VK_SUCCESS) {
 		LOG_CRITICAL("Failed to present swap chain image");
