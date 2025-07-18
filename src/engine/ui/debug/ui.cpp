@@ -8,9 +8,26 @@
 #include <renderer.h>
 #include <vulkan/pipeline.h>
 
+#include "object/component.h"
+#include "object/components/transform_component.h"
+#include "object/components/mesh_renderer_component.h"
+#include "object/components/camera_component.h"
+#include "object/components/script_component.h"
+#include "object/components/rigidbody_component.h"
+#include "object/components/box_component.h"
+#include "object/components/sphere_component.h"
+
+#include "mesh/mesh.h"
+#include "material/material.h"
+
+#include "object/object.h"
+#include "world/world.h"
+
+#include "../../resources/manager/resource_manager.h"
+
 #include <mesh/primitives/primitives.h>
 
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 namespace ui {
 	static void check_vk_result(VkResult err)
@@ -27,135 +44,393 @@ namespace ui {
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	
 
 		ImGui::StyleColorsDark();
 
 		ImGui_ImplGlfw_InitForVulkan(window::_window, false);
-		ImGui_ImplVulkan_InitInfo initInfo{};
-		initInfo.Instance = _renderer.getPipeline()->getInstance();
-		initInfo.PhysicalDevice = _renderer.getPipeline()->getPhysicalDevice();
-		initInfo.Device = _renderer.getPipeline()->getDevice();
-		initInfo.QueueFamily = _renderer.getPipeline()->getQueueFamily();
-		initInfo.Queue = _renderer.getPipeline()->getGraphicsQueue();
-		initInfo.PipelineCache = VK_NULL_HANDLE;
-		initInfo.DescriptorPool = _renderer.getPipeline()->getDescriptorPool();
-		initInfo.RenderPass = _renderer.getPipeline()->getRenderPass();
-		initInfo.Subpass = 0;
-		initInfo.MinImageCount = _renderer.getPipeline()->getMinImageCount();
-		initInfo.ImageCount = _renderer.getPipeline()->getImageCount();
-		initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-		initInfo.Allocator = nullptr;
-		initInfo.CheckVkResultFn = check_vk_result;
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance = _renderer.getPipeline()->getInstance();
+        initInfo.PhysicalDevice = _renderer.getPipeline()->getPhysicalDevice();
+        initInfo.Device = _renderer.getPipeline()->getDevice();
+        initInfo.QueueFamily = _renderer.getPipeline()->getQueueFamily();
+        initInfo.Queue = _renderer.getPipeline()->getGraphicsQueue();
+        initInfo.DescriptorPool = _renderer.getPipeline()->getDescriptorPool();
+        initInfo.MinImageCount = _renderer.getPipeline()->getMinImageCount();
+        initInfo.ImageCount = _renderer.getPipeline()->getImageCount();
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.UseDynamicRendering = true;
+        initInfo.RenderPass = VK_NULL_HANDLE;
+
 		ImGui_ImplVulkan_Init(&initInfo);
 	}
 
-	void debug::drawDebugMenu(pipeline& _pipeline)
-	{
-        static int selectedMesh = -1;
-        static bool showPrimitivePopup = true;
-        static int selectedPrimitive = -1;
+    static void drawObjectNode(Object* object, Object*& selectedObject) {
+        const auto& children = object->getChildren();
+        ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+        if (selectedObject == object) {
+            nodeFlags |= ImGuiTreeNodeFlags_Selected;
+        }
+        if (children.empty()) {
+            nodeFlags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+        }
 
-        ImGui::Begin("Debug Layout");
+        char label[256];
+        snprintf(label, sizeof(label), "%s (ID: %u)", object->getName().c_str(), object->getID());
 
-        if (ImGui::Button("Select Primitive")) {
+        bool nodeOpen = ImGui::TreeNodeEx(object, nodeFlags, "%s", label);
+
+        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+            selectedObject = object;
+        }
+
+        if (nodeOpen) {
+            for (const auto& childPtr : children) {
+                drawObjectNode(childPtr.get(), selectedObject);
+            }
+            if (!children.empty()) {
+                ImGui::TreePop();
+            }
+        }
+        else if (children.empty()) {
+        }
+    }
+
+    Object* drawSceneHierarchy(World& world, renderer& renderer) {
+        static Object* selectedObject = nullptr;
+        ImGui::Begin("Scene Hierarchy");
+
+        if (ImGui::Button("Create Primitive")) {
             ImGui::OpenPopup("Primitive Popup");
         }
 
         if (ImGui::BeginPopup("Primitive Popup")) {
-            if (ImGui::Selectable("Cube")) {
-                auto [vertices, indices] = primitives::createCube();
-                mesh newMesh(vertices, indices);
-                size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
-                newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
-                newMesh.indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                newMesh.indexCount = static_cast<uint32_t>(indices.size());
-                newMesh.transform.translation = glm::vec3(0.0f, 0.0f, -5.0f);
-                _pipeline.meshes.push_back(newMesh);
+            auto createAndSpawnPrimitive = [&](const std::string& primitiveName, const std::function<std::pair<std::vector<vertex>, std::vector<uint32_t>>()>& generator) {
+                if (!ResourceManager::Get().GetMesh(primitiveName)) {
+                    ResourceManager::Get().CreatePrimitive(primitiveName, generator);
+                }
+
+                std::shared_ptr<Material> defaultMat = ResourceManager::Get().GetMaterial("DefaultPBRMaterial");
+                if (!defaultMat) {
+                    defaultMat = std::make_shared<Material>();
+                    defaultMat->name = "DefaultPBRMaterial";
+                    defaultMat->albedoColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+                    defaultMat->roughness = 0.5f;
+                    defaultMat->metallic = 0.0f;
+                    defaultMat->ambientOcclusion = 1.0f;
+                    ResourceManager::Get().RegisterMaterial("DefaultPBRMaterial", defaultMat);
+                }
+
+                auto mesh = ResourceManager::Get().GetMesh(primitiveName);
+
+                if (!mesh || !defaultMat) {
+                    LOG_ERROR("Failed to get mesh (%s) or default material (DefaultPBRMaterial) from ResourceManager!", primitiveName.c_str());
+                    return;
+                }
+
+                auto newObject = world.createObject(primitiveName);
+                newObject->addComponent<MeshRendererComponent>(mesh, defaultMat->name);
+
+                ImGui::CloseCurrentPopup();
+                };
+
+            if (ImGui::Selectable("Cube")) { createAndSpawnPrimitive("Cube", primitives::createCube); }
+            if (ImGui::Selectable("Pyramid")) { createAndSpawnPrimitive("Pyramid", primitives::createPyramid); }
+
+            //if (ImGui::Selectable("Sphere")) { createAndSpawnPrimitive("Sphere", primitives::createSphere); }
+            //if (ImGui::Selectable("Plane")) { createAndSpawnPrimitive("Plane", primitives::createPlane); }
+
+            ImGui::EndPopup();
+        }
+
+        if (ImGui::Button("Create Empty Object")) {
+            world.createObject("Empty Object");
+        }
+        ImGui::SameLine();
+        if (selectedObject && ImGui::Button("Delete Selected")) {
+            if (selectedObject->getParent() == nullptr) {
+                world.removeRootObject(selectedObject);
+            }
+            else {
+                selectedObject->getParent()->removeChild(selectedObject);
+            }
+            selectedObject = nullptr;
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Objects in Scene:");
+
+        const auto& allRootObjects = world.getAllObjects();
+        for (const auto& objPtr : allRootObjects) {
+            Object* currentObject = objPtr.get();
+
+             if (currentObject->getComponent<CameraComponent>() != nullptr) {
+             	continue;
+             }
+
+            drawObjectNode(currentObject, selectedObject);
+        }
+
+        ImGui::End();
+        return selectedObject;
+    }
+
+	void drawInspector(Object* selectedObject) {
+		if (!selectedObject) return;
+
+		ImGui::Begin("Inspector");
+
+		char nameBuffer[256];
+		strncpy(nameBuffer, selectedObject->getName().c_str(), sizeof(nameBuffer) - 1);
+		nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+		if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+			selectedObject->setName(nameBuffer);
+		}
+
+		ImGui::Separator();
+
+        if (TransformComponent* transform = selectedObject->getComponent<TransformComponent>()) {
+            ImGui::Text("Transform");
+            ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+
+            glm::vec3 eulerAngles = transform->getRotationEuler();
+            if (ImGui::DragFloat3("Rotation", &eulerAngles.x, 1.0f)) {
+                transform->setRotation(eulerAngles);
+            }
+
+            ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f);
+        }
+		else {
+			ImGui::Text("Object has no Transform Component.");
+		}
+
+		ImGui::Separator();
+
+		if (MeshRendererComponent* meshRenderer = selectedObject->getComponent<MeshRendererComponent>()) {
+			std::shared_ptr<Material> materialDef = ResourceManager::Get().GetMaterial(meshRenderer->getMaterialID());
+
+			if (materialDef) {
+				ImGui::Text("Material: %s", materialDef->name.c_str());
+
+				if (ImGui::ColorEdit4("Albedo Color", &materialDef->albedoColor.r)) {
+					materialDef->isDirty = true;
+				}
+				if (ImGui::DragFloat("Roughness", &materialDef->roughness, 0.01f, 0.0f, 1.0f)) {
+					materialDef->isDirty = true;
+				}
+				if (ImGui::DragFloat("Metallic", &materialDef->metallic, 0.01f, 0.0f, 1.0f)) {
+					materialDef->isDirty = true;
+				}
+				if (ImGui::DragFloat("Ambient Occlusion", &materialDef->ambientOcclusion, 0.01f, 0.0f, 1.0f)) {
+					materialDef->isDirty = true;
+				}
+
+				if (ImGui::BeginCombo("Select Material", materialDef->name.c_str())) {
+					for (const auto& [id, mat] : ResourceManager::Get().GetAllMaterials()) {
+						bool is_selected = (id == materialDef->name);
+						if (ImGui::Selectable(id.c_str(), is_selected)) {
+							meshRenderer->setMaterialId(id);
+						}
+						if (is_selected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+			}
+			else {
+				ImGui::Text("Material not found: %s", meshRenderer->getMaterialID().c_str());
+			}
+		}
+		else {
+			ImGui::Text("Object has no Mesh Renderer Component.");
+		}
+
+        ImGui::Separator();
+
+        if (RigidBodyComponent* rb = selectedObject->getComponent<RigidBodyComponent>()) {
+            ImGui::Text("Rigid Body");
+
+            if (ImGui::DragFloat("Mass", &rb->mass, 0.1f, 0.0f, 1000.0f)) {
+                rb->isDirty = true;
+            }
+
+            if (SphereComponent* sc = selectedObject->getComponent<SphereComponent>()) {
+                 float radius = sc->getRadius();
+                 if(ImGui::DragFloat("Sphere Radius", &radius, 0.05f)) {
+                    sc->setRadius(radius);
+                 }
+            }
+
+            if (BoxComponent* bc = selectedObject->getComponent<BoxComponent>()) {
+                glm::vec3 halfExtents = bc->getHalfExtents();
+                if (ImGui::DragFloat3("Box Half Extents", &halfExtents.x, 0.05f, 0.01f, 100.0f)) {
+                    bc->setHalfExtents(halfExtents);
+                }
+            }
+
+            bool showDebug = rb->showColliderDebug;
+            if (ImGui::Checkbox("Show Collider Debug", &showDebug)) {
+                rb->showColliderDebug = showDebug;
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Add Component")) {
+            ImGui::OpenPopup("AddComponentPopup");
+        }
+
+        if (ImGui::BeginPopup("AddComponentPopup")) {
+            ImGui::Text("Available Components");
+            ImGui::Separator();
+
+            if (ImGui::Selectable("Rigid Body")) {
+                if (!selectedObject->getComponent<RigidBodyComponent>()) {
+                    selectedObject->addComponent<RigidBodyComponent>();
+                }
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::Selectable("Pyramid")) {
-                auto [vertices, indices] = primitives::createPyramid();
-                mesh newMesh(vertices, indices);
-                size_t vertexByteOffset = _pipeline.getVertexBuffer()->appendVertices(vertices);
-                newMesh.vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                size_t indexByteOffset = _pipeline.getIndexBuffer()->appendIndices(indices);
-                newMesh.indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                newMesh.indexCount = static_cast<uint32_t>(indices.size());
-                newMesh.transform.translation = glm::vec3(0.0f, 0.0f, -5.0f);
-                _pipeline.meshes.push_back(newMesh);
+
+            if (ImGui::Selectable("Box Collider")) {
+                if (!selectedObject->getComponent<ColliderComponent>()) {
+                    selectedObject->addComponent<BoxComponent>(glm::vec3(1, 1, 1));
+
+                    if (auto rb = selectedObject->getComponent<RigidBodyComponent>()) rb->isDirty = true;
+                }
                 ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::Selectable("Sphere Collider")) {
+                if (!selectedObject->getComponent<ColliderComponent>()) {
+                    selectedObject->addComponent<SphereComponent>(0.5f);
+                    if (auto rb = selectedObject->getComponent<RigidBodyComponent>()) rb->isDirty = true;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::Spacing();
+
+            ImGui::Text("Available Scripts");
+            ImGui::Separator();
+
+            const auto& scriptFactories = ResourceManager::Get().GetAllScriptFactories();
+
+            if (scriptFactories.empty()) {
+                ImGui::TextDisabled("No scripts found in Game.dll");
+            }
+            else {
+                for (const auto& [name, factory] : scriptFactories) {
+                    if (ImGui::Selectable(name.c_str())) {
+                        auto newScriptInstance = ResourceManager::Get().CreateScriptInstance(name);
+                        if (newScriptInstance) {
+                            selectedObject->addComponent<ScriptComponent>(std::move(newScriptInstance));
+                        }
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
             }
             ImGui::EndPopup();
         }
 
-        ImGui::Text("Number of Meshes: %zu", _pipeline.meshes.size());
-        ImGui::Text("Selected Mesh: %d", selectedMesh);
+		ImGui::End();
+	}
 
-        ImGui::Separator();
-        ImGui::Text("Meshes in Scene:");
-        static int selectedMeshLocal = -1;
-        for (size_t i = 0; i < _pipeline.meshes.size(); ++i) {
-            char label[32];
-            sprintf(label, "Mesh %zu", i);
-            if (ImGui::Selectable(label, selectedMeshLocal == static_cast<int>(i))) {
-                selectedMeshLocal = static_cast<int>(i);
-                selectedMesh = selectedMeshLocal;
+	void drawAssetBrowser(World& world, renderer& renderer) {
+		static char modelPathBuffer[256] = "Chair.fbx";
+		static std::string selectedMeshID;
+
+		ImGui::Begin("Asset Browser");
+
+		ImGui::Text("Load New Model");
+		ImGui::InputText("##ModelPath", modelPathBuffer, sizeof(modelPathBuffer));
+		ImGui::SameLine();
+		if (ImGui::Button("Load")) {
+			ResourceManager::Get().LoadModel(modelPathBuffer);
+		}
+		ImGui::Separator();
+
+		static std::string selectedModelID;
+		if (ImGui::CollapsingHeader("Models")) {
+			for (const auto& [id, prefab] : ResourceManager::Get().GetAllModelPrefabs()) {
+				if (ImGui::Selectable(id.c_str(), selectedModelID == id)) {
+					selectedModelID = id;
+				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Materials")) {
+			for (const auto& [id, material] : ResourceManager::Get().GetAllMaterials()) {
+				ImGui::Text(id.c_str());
+			}
+		}
+
+		ImGui::Separator();
+
+        if (!selectedModelID.empty()) {
+            ImGui::Text("Selected Model: %s", selectedModelID.c_str());
+            if (ImGui::Button("Spawn in World")) {
+                Object* prefab = ResourceManager::Get().GetModelPrefab(selectedModelID);
+                if (prefab) {
+                    std::unique_ptr<Object> instance = prefab->deepCopy();
+
+                    std::vector<Object*> allChildren;
+                    std::function<void(Object*)> collectChildren =
+                        [&](Object* current) {
+                        if (!current) return;
+                        allChildren.push_back(current);
+                        for (const auto& child : current->getChildren()) {
+                            collectChildren(child.get());
+                        }
+                        };
+                    collectChildren(instance.get());
+
+                    for (Object* obj : allChildren) {
+                        if (auto* mrc = obj->getComponent<MeshRendererComponent>()) {
+                            auto mesh = mrc->getMesh();
+                            if (mesh && mesh->vertexCount == 0) {
+                                auto pipeline = renderer.getPipeline();
+                                size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(mesh->getVertices());
+                                size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(mesh->getIndices());
+
+                                mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
+                                mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
+                                mesh->vertexCount = static_cast<uint32_t>(mesh->getVertices().size());
+                                mesh->indexCount = static_cast<uint32_t>(mesh->getIndices().size());
+                            }
+                        }
+                    }
+
+                    world.addObject(std::move(instance));
+                }
             }
         }
 
-        ImGui::Separator();
-        ImGui::Text("Environment Settings");
-        static float sunDir[3] = { 1.0f, 1.0f, -1.0f };
+		ImGui::End();
+	}
+
+    void drawLightingControls(pipeline& pipelineInstance) {
+        ImGui::Begin("Lighting Settings");
+
+        ImGui::Text("Sun Light");
+
+        glm::vec3 currentSunLightDirection = pipelineInstance.sunDirection;
+        if (ImGui::SliderFloat3("Direction", &currentSunLightDirection.x, -1.0f, 1.0f)) {
+            pipelineInstance.sunDirection = currentSunLightDirection;
+        }
+
+        float currentSunLightIntensity = pipelineInstance.sunIntesnity;
+        if (ImGui::SliderFloat("Intensity", &currentSunLightIntensity, 0.0f, 200.0f)) {
+            pipelineInstance.sunIntesnity = currentSunLightIntensity;
+        }
 
         ImGui::End();
-        
-        if (selectedMesh >= 0 && selectedMesh < static_cast<int>(_pipeline.meshes.size())) {
-            ImGui::SetNextWindowPos(ImVec2(400, 100), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Mesh Settings");
+    }
 
-            mesh& selected = _pipeline.meshes[selectedMesh];
-            ImGui::Text("Edit Mesh %d Transform", selectedMesh);
-            float pos[3] = { selected.transform.translation.x, selected.transform.translation.y, selected.transform.translation.z };
-            if (ImGui::DragFloat3("Position", pos, 0.1f)) {
-                selected.transform.translation = glm::vec3(pos[0], pos[1], pos[2]);
-            }
-            float rot[3] = { selected.transform.rotation.x, selected.transform.rotation.y, selected.transform.rotation.z };
-            if (ImGui::DragFloat3("Rotation", rot, 0.5f)) {
-                selected.transform.rotation = glm::vec3(rot[0], rot[1], rot[2]);
-            }
-            float scale[3] = { selected.transform.scale.x, selected.transform.scale.y, selected.transform.scale.z };
-            if (ImGui::DragFloat3("Scale", scale, 0.1f)) {
-                selected.transform.scale = glm::vec3(scale[0], scale[1], scale[2]);
-            }
-
-            ImGui::Separator();
-            ImGui::Text("Material Settings");
-
-            // Diffuse Color
-            {
-                float diffuse[3] = { selected.material.diffuseColor.r,
-                                     selected.material.diffuseColor.g,
-                                     selected.material.diffuseColor.b };
-                if (ImGui::ColorEdit3("Diffuse Color", diffuse)) {
-                    selected.material.diffuseColor = glm::vec3(diffuse[0], diffuse[1], diffuse[2]);
-                }
-            }
-
-            {
-                if (ImGui::DragFloat("Ambient Factor", &selected.material.ambientFactor, 0.01f, 0.0f, 5.0f)) {
-                    // already
-                }
-            }
-
-
-            if (ImGui::Button("Reset Material")) {
-                selected.material.diffuseColor = glm::vec3(1.0f);
-            }
-
-
-            ImGui::End();
-        }
-	}
+    void debug::drawDebugMenu(World& world, renderer& renderer)
+    {
+        Object* selectedObject = drawSceneHierarchy(world, renderer);
+        drawInspector(selectedObject);
+        drawAssetBrowser(world, renderer);
+        drawLightingControls(*renderer.getPipeline());
+    }
 }

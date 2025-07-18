@@ -3,7 +3,7 @@
 #include <vulkan/pipeline.h>
 
 #include <GLFW/glfw3.h>
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 GLFWwindow* window::_window;
 bool window::framebufferResized = false;
@@ -60,6 +60,7 @@ void window::init(const uint32_t width, const uint32_t height, const char* title
 	}
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
 	_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
 	if (!_window) {

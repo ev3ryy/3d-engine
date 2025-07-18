@@ -1,27 +1,19 @@
 #include "input.h"
-#include <spdlog/spdlog.h>
+#include <logs.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 
 #include <GLFW/glfw3.h>
 
-std::unordered_map<keycode, bool> input::keyStates;
-std::unordered_map<keycode, bool> input::keyDown;
-std::unordered_map<keycode, bool> input::keyUp;
-float input::mouseDeltaX = 0.0f;
-float input::mouseDeltaY = 0.0f;
-float input::scrollDeltaX = 0.0f;
-float input::scrollDeltaY = 0.0f;
-
 static void GLFWKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-    input::OnKeyEvent(key, action);
+    Input::onKeyEvent(key, action);
 }
 
 static void GLFWCharCallback(GLFWwindow* window, unsigned int codepoint) {
     ImGui_ImplGlfw_CharCallback(window, codepoint);
-    input::OnCharEvent(codepoint);
+    Input::onCharEvent(codepoint);
 }
 
 static void GLFWMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
@@ -39,24 +31,32 @@ static void GLFWCursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
         firstMouse = false;
     }
     float xoffset = static_cast<float>(xpos) - lastX;
-    float yoffset = lastY - static_cast<float>(ypos); // инвертируем Y-ось
+    float yoffset = lastY - static_cast<float>(ypos);
 
     lastX = static_cast<float>(xpos);
     lastY = static_cast<float>(ypos);
 
-    input::addMouseDelta(xoffset, yoffset);
+    Input::addMouseDelta(xoffset, yoffset);
 }
 
 static void GLFWScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
-    input::addScrollDelta(static_cast<float>(xoffset), static_cast<float>(yoffset));
+    Input::addScrollDelta(static_cast<float>(xoffset), static_cast<float>(yoffset));
 }
 
-void input::init(GLFWwindow* window) {
+void Input::init(GLFWwindow* window) {
     if (!window) {
         LOG_ERROR("[input]: failed to find window");
         return;
     }
+
+    Input::instance().keyStates.clear();
+    Input::instance().keyDown.clear();
+    Input::instance().keyUp.clear();
+    Input::instance().mouseDeltaX = 0.0f;
+    Input::instance().mouseDeltaY = 0.0f;
+    Input::instance().scrollDeltaX = 0.0f;
+    Input::instance().scrollDeltaY = 0.0f;
 
     glfwSetKeyCallback(window, GLFWKeyCallback);
     glfwSetCharCallback(window, GLFWCharCallback);
@@ -67,63 +67,64 @@ void input::init(GLFWwindow* window) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
-void input::update() {
-    for (auto& state : keyDown)
+void Input::update() {
+    for (auto& state : instance().keyDown)
         state.second = false;
-    for (auto& state : keyUp)
+    for (auto& state : instance().keyUp)
         state.second = false;
+
+    instance().mouseDeltaX = 0.0f;
+    instance().mouseDeltaY = 0.0f;
+    instance().scrollDeltaX = 0.0f;
+    instance().scrollDeltaY = 0.0f;
 }
 
-bool input::IsKeyDown(keycode key) {
+bool Input::isKeyDown(keycode key) const {
     auto it = keyStates.find(key);
     return it != keyStates.end() ? it->second : false;
 }
-bool input::WasKeyPressed(keycode key) {
+bool Input::wasKeyPressed(keycode key) const {
     auto it = keyDown.find(key);
     return it != keyDown.end() ? it->second : false;
 }
-bool input::WasKeyReleased(keycode key) {
+bool Input::wasKeyReleased(keycode key) const {
     auto it = keyUp.find(key);
     return it != keyUp.end() ? it->second : false;
 }
 
-void input::OnKeyEvent(int glfwKey, int action) {
-    keycode key = static_cast<keycode>(glfwKey);
-    if (action == GLFW_PRESS) {
-        keyStates[key] = true;
-        keyDown[key] = true;
-    }
-    else if (action == GLFW_RELEASE) {
-        keyStates[key] = false;
-        keyUp[key] = true;
-    }
-}
-
-void input::OnCharEvent(unsigned int /*codepoint*/) {
-
-}
-
-void input::addMouseDelta(float xoffset, float yoffset) {
-    mouseDeltaX += xoffset;
-    mouseDeltaY += yoffset;
-}
-
-void input::getMouseDelta(float& xoffset, float& yoffset) {
+void Input::getMouseDelta(float& xoffset, float& yoffset) const {
     xoffset = mouseDeltaX;
     yoffset = mouseDeltaY;
-
-    mouseDeltaX = 0.0f;
-    mouseDeltaY = 0.0f;
 }
 
-void input::addScrollDelta(float xoffset, float yoffset) {
-    scrollDeltaX += xoffset;
-    scrollDeltaY += yoffset;
-}
-
-void input::getScrollDelta(float& xoffset, float& yoffset) {
+void Input::getScrollDelta(float& xoffset, float& yoffset) const {
     xoffset = scrollDeltaX;
     yoffset = scrollDeltaY;
-    scrollDeltaX = 0.0f;
-    scrollDeltaY = 0.0f;
+}
+
+void Input::onKeyEvent(int glfwKey, int action) {
+    keycode key = static_cast<keycode>(glfwKey);
+
+    if (action == GLFW_PRESS) {
+        instance().keyStates[key] = true;
+        instance().keyDown[key] = true;
+    }
+    else if (action == GLFW_RELEASE) {
+        instance().keyStates[key] = false;
+        instance().keyUp[key] = true;
+    }
+}
+
+void Input::onCharEvent(unsigned int codepoint) {
+    // ...
+}
+
+void Input::addMouseDelta(float xoffset, float yoffset) {
+    instance().mouseDeltaX += xoffset;
+    instance().mouseDeltaY += yoffset;
+}
+
+void Input::addScrollDelta(float xoffset, float yoffset) {
+    instance().scrollDeltaX += xoffset;
+    instance().scrollDeltaY += yoffset;
 }

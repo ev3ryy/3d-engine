@@ -1,58 +1,48 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
+
+if (DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+endif()
 project(MyEngine)
+
+message(STATUS "VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# set(CMAKE_C_COMPILER "clang")
-# set(CMAKE_CXX_COMPILER "clang++")
-
-set(CMAKE_MAKE_PROGRAM "C:/Program Files/ninja/ninja.exe")
-set(CMAKE_GENERATOR "Ninja")
-
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
-# if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-#     message(FATAL_ERROR "Clang required")
-# endif()
-
-#add_compile_options(-Wall -Wextra -Werror)
-add_compile_options(/utf-8)
-
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
+add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
+add_subdirectory(${CMAKE_SOURCE_DIR}/include/bullet3 EXCLUDE_FROM_ALL)
 
 find_package(Vulkan REQUIRED)
+# find_package(Bullet CONFIG REQUIRED)
 
 add_subdirectory(src/modules/core)
 add_subdirectory(src/modules/renderer)
 add_subdirectory(src/modules/input)
 add_subdirectory(src/modules/logger)
 
-file(GLOB_RECURSE ENGINE_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/engine/*.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/*.h
-    ${PROJECT_SOURCE_DIR}/src/engine/*.hpp
-)
-source_group(TREE ${PROJECT_SOURCE_DIR}/src/engine FILES ${ENGINE_SOURCES})
-
 file(GLOB IMGUI_SOURCES
     "${CMAKE_SOURCE_DIR}/include/imgui/*.cpp"
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan/*.cpp"
 )
 
-add_library(imgui STATIC ${IMGUI_SOURCES})
+add_library(EngineImgui STATIC ${IMGUI_SOURCES})
 
-target_include_directories(imgui PUBLIC
+target_compile_options(EngineImgui PUBLIC /utf-8)
+
+target_include_directories(EngineImgui PUBLIC
     "${CMAKE_SOURCE_DIR}/include/imgui"
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan"
     "${CMAKE_SOURCE_DIR}/include/glfw/include"
+    "${CMAKE_SOURCE_DIR}/include/glm"
+    "${CMAKE_SOURCE_DIR}/include/assimp/include"
     ${Vulkan_INCLUDE_DIRS}
 )
 
-add_executable(engine ${ENGINE_SOURCES})
+add_subdirectory(src/engine)
+add_subdirectory(src/game)
+add_subdirectory(src/editor)
+add_subdirectory(src/game_app)
 
-target_link_libraries(engine PRIVATE core renderer input logger imgui glfw ${Vulkan_LIBRARIES})
-
-target_sources(engine PRIVATE ${CORE_SOURCES} ${RENDERER_SOURCES} ${INPUT_SOURCES})
-
-set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT engine)
+set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Editor)

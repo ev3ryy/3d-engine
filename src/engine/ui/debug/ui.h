@@ -2,13 +2,13 @@
 #define DEBUG_UI_H
 
 class renderer;
-class pipeline;
+class World;
 
 namespace ui {
 	class debug {
 	public:
 		static void initialize(renderer& _renderer);
-		static void drawDebugMenu(pipeline& _pipeline);
+		static void drawDebugMenu(World& world, renderer& renderer);
 	};
 }
 

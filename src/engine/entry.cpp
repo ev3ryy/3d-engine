@@ -1,6 +1,11 @@
 #include "entry.h"
 
 #include "ui/debug/ui.h"
+#include "scene/world/world.h"
+#include "scene/object/components/camera_component.h"
+#include "scene/object/components/rigidbody_component.h"
+
+#include "resources/manager/resource_manager.h"
 
 #include <imgui.h>
 #include <vulkan/imgui_impl_glfw.h>
@@ -16,80 +21,126 @@
 
 #include <utils/keycodes.h>
 
+#include <physics/world/physics_world.h>
+
 #include <iostream>
 #include <filesystem>
 #include <sstream>
 
-config entry::_config;
-
-entry::entry(core* coreInstance, renderer* rendererInstance)
+Engine::Engine(core* coreInstance, renderer* rendererInstance)
     : _core(coreInstance), _renderer(rendererInstance)
 {
     if (!_renderer) {
         throw std::runtime_error("Renderer is null");
     }
 
-    _pipeline = _renderer->getPipeline();
+    ResourceManager::Get().Initialize(_renderer);
 
-    if (!_pipeline) {
-        LOG_CRITICAL("pipeline pointer is null");
+    lastTime = std::chrono::high_resolution_clock::now();
+}
+
+Engine::~Engine() {
+    _renderer->waitDeviceIdle();
+}
+
+float Engine::getDeltaTime() {
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+    lastTime = currentTime;
+    return deltaTime;
+}
+
+void Engine::onStateChanged(EngineState newState)
+{
+    switch (newState) {
+    case EngineState::PLAYING:
+        LOG_INFO("Engine State: Transitioned to PLAYING. Initializing all RigidBodyComponents.");
+        for (auto& object : world->getAllObjects()) {
+            if (auto rb = object->getComponent<RigidBodyComponent>()) {
+                rb->initialize(physicsWorld.get());
+            }
+        }
+        break;
+    case EngineState::EDITING:
+        LOG_INFO("Engine State: Transitioned to EDITING.");
+        break;
     }
 }
 
-entry::~entry() {
+bool Engine::run(std::function<void(float deltaTime, World&, renderer&, ResourceManager&)> editorUpdateCallback,
+    std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
+    GLFWwindow* windowHandle)
+{
+    world = std::make_unique<World>();
+    physicsWorld = std::make_unique<PhysicsWorld>();
 
-}
+    auto cameraObj = world->createObject("MainCamera");
+    auto cameraComp = cameraObj->addComponent<CameraComponent>(
+        glm::vec3(0.0f, 0.0f, 3.0f), // position
+        glm::vec3(0.0f, 1.0f, 0.0f), // up
+        -90.0f,                      // yaw
+        0.0f                         // pitch
+    );
 
-void entry::mainLoop() {
-    bool flag = false;;
+    world->setActiveRenderCamera(&cameraComp->camera);
 
-    ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    _pipeline->imClearColor = clearColor;
+    const float fixedTimeStep = 1.0f / 60.0f;
+    float accumulator = 0.0f;
+    const int MAX_PHYSICS_STEPS = 5;
 
-    while (!glfwWindowShouldClose(window::_window)) {
-        static auto lastTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
-        lastTime = currentTime;
-
-        input::update();
-        glfwPollEvents();
-
-        bool cameraControlActive = (glfwGetMouseButton(window::_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-
-        if (cameraControlActive) {
-            glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-            bool shiftDown = input::IsKeyDown(keycode::LShift);
-
-            float speedMultiplier = shiftDown ? 2.0f : 1.0f;
-            float adjustedDeltaTime = deltaTime * speedMultiplier;
-
-            if (input::IsKeyDown(keycode::W))
-                _pipeline->_camera.ProcessKeyboard(Camera_Movement::FORWARD, adjustedDeltaTime);
-            if (input::IsKeyDown(keycode::S))
-                _pipeline->_camera.ProcessKeyboard(Camera_Movement::BACKWARD, adjustedDeltaTime);
-            if (input::IsKeyDown(keycode::A))
-                _pipeline->_camera.ProcessKeyboard(Camera_Movement::LEFT, adjustedDeltaTime);
-            if (input::IsKeyDown(keycode::D))
-                _pipeline->_camera.ProcessKeyboard(Camera_Movement::RIGHT, adjustedDeltaTime);
-
-            float xoffset, yoffset;
-            input::getMouseDelta(xoffset, yoffset);
-            if (xoffset != 0.0f || yoffset != 0.0f)
-                _pipeline->_camera.ProcessMouseMovement(xoffset, yoffset);
-
-            float scrollX, scrollY;
-            input::getScrollDelta(scrollX, scrollY);
-            if (scrollY != 0.0f) {
-                const float speedSensitivity = 0.1f; // Коэффициент изменения скорости
-                _pipeline->_camera.SetSpeed(_pipeline->_camera.movementSpeed + scrollY * speedSensitivity);
+    for (auto& objectPtr : world->getAllObjects()) {
+        Object* object = objectPtr.get();
+        if (RigidBodyComponent* rb = object->getComponent<RigidBodyComponent>()) {
+            if (rb->isDirty) {
+                if (rb->GetBtRigidBody() == nullptr) {
+                    rb->initialize(physicsWorld.get());
+                }
+                else {
+                    rb->updatePhysicsProperties();
+                }
+                rb->isDirty = false;
             }
         }
-        else {
-            glfwSetInputMode(window::_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            float dummyX, dummyY;
-            input::getMouseDelta(dummyX, dummyY);
+    }
+
+    while (!glfwWindowShouldClose(window::_window)) {
+        float deltaTime = getDeltaTime();
+        accumulator += deltaTime;
+
+        Input::update();
+        glfwPollEvents();
+
+        bool physicsReady = physicsFuture.valid() &&
+            physicsFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+
+        if (physicsReady) {
+            physicsFuture.get();
+        }
+
+        bool isPhysicsRunning = physicsFuture.valid() && !physicsReady;
+        if (!isPhysicsRunning && accumulator >= fixedTimeStep) {
+            physicsFuture = std::async(std::launch::async, [&]() {
+                switch (currentState) {
+                case EngineState::PLAYING:
+                    for (auto& objectPtr : world->getAllObjects()) {
+                        if (auto rb = objectPtr->getComponent<RigidBodyComponent>()) {
+                            rb->setPrevPhysicsPosition(rb->getCurrentPhysicsPosition());
+                            rb->setPrevPhysicsRotation(rb->getCurrentPhysicsRotation());
+                        }
+                    }
+                    physicsWorld->Update(fixedTimeStep);
+                    break;
+                default:
+                    break;
+                }
+                });
+            accumulator -= fixedTimeStep;
+        }
+
+        world->update(deltaTime);
+
+        if (gameUpdateCallback) {
+            gameUpdateCallback(deltaTime, *world.get(), ResourceManager::Get(), &Input::instance());
         }
 
         int fb_width, fb_height;
@@ -104,45 +155,24 @@ void entry::mainLoop() {
             last_fb_height = fb_height;
         }
 
-        // start imgui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+        float alpha = 0.0f;
+        if (fixedTimeStep > 0) {
+            alpha = accumulator / fixedTimeStep;
 
-        PerformanceStats stats = window::updatePerfomanceStats();
-
-        if (_config.mainWindow) {
-            ui::debug::drawDebugMenu(*_pipeline);
+            if (alpha < 0.0f) alpha = 0.0f;
+            if (alpha > 1.0f) alpha = 1.0f;
         }
 
-        ImGui::Render();
-        _pipeline->drawFrame();
+        if (editorUpdateCallback) {
+            editorUpdateCallback(deltaTime, *world.get(), *_renderer, ResourceManager::Get());
+        }
+
+        _renderer->render(*world.get(), ResourceManager::Get(), alpha, physicsWorld.get());
     }
 
-    vkDeviceWaitIdle(_pipeline->getDevice());
-}
+    if (physicsFuture.valid()) {
+        physicsFuture.wait();
+    }
 
-int main() {
-    logger::init();
-
-    auto _core = std::make_unique<core>();
-    auto _renderer = std::make_unique<renderer>();
-
-    ui::debug::initialize(*_renderer); // initialize imgui debug ui
-
-    auto _entry = std::make_unique<entry>(_core.get(), _renderer.get());
-    entry::_config.mainWindow = true;
-
-    input::init(window::_window);
-
-    _renderer->getPipeline()->_camera = camera(
-        glm::vec3(0.0f, 0.0f, 3.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        -90.0f,
-        0.0f
-    );
-
-    _entry->mainLoop();
-
-    return 0;
+    return false;
 }

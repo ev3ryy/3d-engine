@@ -13,7 +13,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include "buffers.h"
+#include "buffers/buffers.h"
 #include "queuefamily.h"
 #include "swapchain.h"
 #include "validation.h"
@@ -21,15 +21,42 @@
 #include "mesh/mesh.h"
 
 #include "window/window.h"
-#include "camera/camera.h"
 
 #include <imgui.h>
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+struct DebugLineVertex;
+
 struct PushConstantData {
     glm::mat4 model;
-    MaterialUniform material;
+};
+
+struct RenderItem {
+    glm::mat4 modelMatrix;
+    MaterialInstance material;
+    uint32_t indexCount;
+    uint32_t indexOffset;
+    uint32_t vertexOffset;
+};
+
+struct RenderObject {
+    MaterialInstance* material = nullptr;
+    Mesh* mesh = nullptr;
+    glm::mat4 modelMatrix;
+};
+
+struct RenderFrameData {
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
+    VkDescriptorSet globalDescriptorSet = VK_NULL_HANDLE;
+    std::vector<RenderItem> renderItems;
+
+    uint32_t viewportWidth;
+    uint32_t viewportHeight;
+
+    ImVec4 clearColor;
+    ImDrawData* imguiDrawData = nullptr;
 };
 
 class pipeline {
@@ -37,19 +64,30 @@ public:
     pipeline();
 	~pipeline();
 
-    void drawFrame();
+    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj, glm::vec3 cameraPos);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData, const std::vector<RenderObject>& renderObjects);
 
-    void addInstance(mesh* meshPtr, const Transform& transform);
+    MaterialInstance* getOrCreateMaterialInstance(Material& material);
 
-    VkInstance          getInstance() const { return instance; }
-    VkPhysicalDevice    getPhysicalDevice() const { return physicalDevice; }
-    VkDevice            getDevice() const { return device; }
-    VkQueue             getGraphicsQueue() const { return graphicsQueue; }
-    uint32_t            getQueueFamily() const { return queueFamily; }
-    VkRenderPass        getRenderPass() const { return renderPass; }
-    VkDescriptorPool    getDescriptorPool() const { return descriptorPool; }
-    uint32_t            getMinImageCount() const { return _swapchain->minImageCount; }
-    uint32_t            getImageCount() const { return _swapchain->imageCount; }
+    void createWireframeBuffers(const std::vector<DebugLineVertex>& vertices, const std::vector<uint32_t>& indices);
+
+    VkInstance                      getInstance() const { return instance; }
+    VkPhysicalDevice                getPhysicalDevice() const { return physicalDevice; }
+    VkDevice                        getDevice() const { return device; }
+    VkQueue                         getGraphicsQueue() const { return graphicsQueue; }
+    VkQueue                         getPresentQueue() const { return presentQueue; }
+    uint32_t                        getQueueFamily() const { return queueFamily; }
+    //VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
+    //VkRenderPass                    getImGuiRenderPass() const { return imguiRenderPass; }
+    //VkRenderPass                    getFinalRenderPass() const { return finalRenderPass; }
+    VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
+    uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
+    uint32_t                        getImageCount() const { return _swapchain->imageCount; }
+    uint32_t                        getCurrentFrame() const { return currentFrame; }
+    VkImageView                     getSwapchainDepthImageView() const { return swapchainDepthImageView; };
+    std::vector<VkDescriptorSet>    getDescriptorSets() const { return descriptorSets; }
+
+    void                            setCurrentFrame(uint32_t currentFrame) { currentFrame = currentFrame; }
     
     swapchain* getSwapchain() const { return _swapchain; }
 
@@ -58,12 +96,16 @@ public:
 
     bool vsync = false;
 
-    camera _camera;
-
     ImVec4 imClearColor;
 
-    std::vector<mesh> meshes;
-    std::unordered_map<mesh*, InstanceGroup> instanceGroups;
+    std::vector<VkFence> inFlightFences;
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+
+    std::vector<VkCommandBuffer> commandBuffers;
+
+    glm::vec3 sunDirection = glm::vec3(1.0f, -1.0f, 1.0f);
+    float sunIntesnity = 50.0f;
 
 private:
 	void init();
@@ -82,28 +124,43 @@ private:
         VkImage& image, VkDeviceMemory& imageMemory);
     VkFormat findDepthFormat();
     void createDepthResources();
-    void createRenderPass();
-    void createGraphicsPipeline();
+
+    //void createGBufferRenderPass();
+    //void createLightingRenderPass();
+    //void createWireframeRenderPass();
+    //void createImGuiRenderPass();
+
+    //void createFinalRenderPass();
+
+    void createGBufferPipeline();
+    void createLightingPipeline();
+    void createWireframePipeline();
+
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
     void createCommandPool();
     void createCommandBuffer();
-
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void createSyncObjects();
 
     void createDescriptorPool();
-    //void createVertexBuffer(const std::vector<mesh>& meshes);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    //void createIndexBuffer();
     void createDescriptorSetLayout();
     void createUniformBuffers();
-    void updateUniformBuffer(uint32_t currentImage);
-    void createMaterialUniformBuffers();
-    void updateMaterialUniformBuffer(uint32_t currentImage, const MaterialUniform& materialData);
-    void createDescriptorSets();
+    void createGlobalDescriptorSet();
+    void createMaterialDescriptorPool();
+
+    //void createGBufferFramebuffer();
+    void createGBufferDescriptorSetLayout();
+    void createGBufferDescriptorSet();
+
+    void createGBufferResources();
+    void createGBufferSampler();
+
+    void createSwapchainDepthResources();
+
+    void destroyWireframeBuffers();
 
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -112,25 +169,21 @@ private:
     VkQueue presentQueue;
     VkSurfaceKHR surface;
 
-
-    VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
 
     VkCommandPool commandPool;
-    std::vector<VkCommandBuffer> commandBuffers;
 
-    std::vector<VkSemaphore> imageAvailableSemaphores;
-    std::vector<VkSemaphore> renderFinishedSemaphores;
-    std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
     uint32_t queueFamily = 0;
 
     VkDescriptorPool descriptorPool;
+    VkDescriptorPool materialDescriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
-    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorSetLayout globalDescriptorSetLayout;
+    VkDescriptorSetLayout materialDescriptorSetLayout;
 
     //VkBuffer vertexBuffer; // vertices
     //VkDeviceMemory vertexBufferMemory;
@@ -141,9 +194,9 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
-    std::vector<VkBuffer> materialUniformBuffers;
-    std::vector<VkDeviceMemory> materialUniformBuffersMemory;
-    std::vector<void*> materialUniformBuffersMapped;
+    //std::vector<VkBuffer> materialUniformBuffers;
+    //std::vector<VkDeviceMemory> materialUniformBuffersMemory;
+    //std::vector<void*> materialUniformBuffersMapped;
 
     std::vector<VkBuffer> modelUniformBuffers;
     std::vector<VkDeviceMemory> modelUniformBuffersMemory;
@@ -152,20 +205,117 @@ private:
     size_t currentInstanceCapacity = 100;
 
     const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+        VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
     };
 
     buffers::vertexBuffer* _vertexBuffer;
     buffers::indexBuffer* _indexBuffer;
+
+    VkBuffer wireframeVertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory wireframeVertexMemory = VK_NULL_HANDLE;
+    VkBuffer wireframeIndexBuffer = VK_NULL_HANDLE; 
+    VkDeviceMemory wireframeIndexMemory = VK_NULL_HANDLE;
+
+    uint32_t wireframeVertexCount = 0;
+    uint32_t wireframeIndexCount = 0;
+
     swapchain* _swapchain;
 
     VmaAllocator allocator;
 
     PushConstantData pushData;
 
-    VkImage depthImage;
-    VkImageView depthImageView;
-    VkDeviceMemory depthImageMemory;
+    //VkImage depthImage;
+    //VkImageView depthImageView;
+    //VkDeviceMemory depthImageMemory;
+
+    VkImage gBufferDepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory gBufferDepthImageMemory = VK_NULL_HANDLE;
+    VkImageView gBufferDepthImageView = VK_NULL_HANDLE;
+
+    VkImage swapchainDepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory swapchainDepthImageMemory = VK_NULL_HANDLE;
+    VkImageView swapchainDepthImageView = VK_NULL_HANDLE;
+
+    std::unordered_map<std::string, std::unique_ptr<MaterialInstance>> materialCache;
+
+    // gBuffer setup
+    struct {
+        VkImage albedo;
+        VkDeviceMemory albedoMem;
+        VkImageView albedoView;
+        VkImage normal;
+        VkDeviceMemory normalMem;
+        VkImageView normalView;
+        VkImage emissive;
+        VkDeviceMemory emissiveMem;
+        VkImageView emissiveView;
+    } gBuffer;
+
+    //VkFramebuffer gBufferFramebuffer;
+
+    //VkRenderPass gBufferRenderPass;
+
+    //VkRenderPass finalRenderPass;
+
+    VkPipeline gBufferPipeline;
+    VkPipelineLayout gBufferPipelineLayout;
+
+    VkPipeline lightingPipeline;
+    VkPipelineLayout lightingPipelineLayout;
+
+    VkPipeline wireframePipeline;
+    VkPipelineLayout wireframePipelineLayout;
+
+    VkSampler gBufferSampler;
+    VkDescriptorSetLayout gBufferDescriptorSetLayout;
+    VkDescriptorSet gBufferDescriptorSet;
+
+    // delete this
+    VkImage defaultAlbedoImage = VK_NULL_HANDLE;
+    VmaAllocation defaultAlbedoImageAllocation = nullptr;
+    VkImageView defaultAlbedoImageView = VK_NULL_HANDLE;
+    VkSampler defaultAlbedoSampler = VK_NULL_HANDLE;
+
+    VkImage defaultNormalImage = VK_NULL_HANDLE;
+    VmaAllocation defaultNormalImageAllocation = nullptr;
+    VkImageView defaultNormalImageView = VK_NULL_HANDLE;
+    VkSampler defaultNormalSampler = VK_NULL_HANDLE;
+
+    VkImage defaultMetallicRoughnessImage = VK_NULL_HANDLE;
+    VmaAllocation defaultMetallicRoughnessImageAllocation = nullptr;
+    VkImageView defaultMetallicRoughnessImageView = VK_NULL_HANDLE;
+    VkSampler defaultMetallicRoughnessSampler = VK_NULL_HANDLE;
+
+    VkImage defaultAoImage = VK_NULL_HANDLE;
+    VmaAllocation defaultAoImageAllocation = nullptr;
+    VkImageView defaultAoImageView = VK_NULL_HANDLE;
+    VkSampler defaultAoSampler = VK_NULL_HANDLE;
+
+
+    void createDefaultTextures();
+    void cleanupDefaultTextures();
+
+    void createSingleDefaultTexture(
+        uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage,
+        VkImage& image, VmaAllocation& imageAllocation, VkImageView& imageView,
+        const std::vector<unsigned char>& pixelData
+    );
+    void createDefaultSampler(VkSampler& sampler);
+
+    VkDescriptorImageInfo GetDefaultAlbedoTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultNormalTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultMetallicRoughnessTextureInfo() const;
+    VkDescriptorImageInfo GetDefaultAoTextureInfo() const;
+
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkCommandBuffer commandBuffer);
 };
 
 #endif // RENDERER_VULKAN_H
