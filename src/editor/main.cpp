@@ -49,6 +49,8 @@ int main() {
 	auto _core = std::make_unique<core>();
 	auto _renderer = std::make_unique<renderer>();
 
+    _renderer->init();
+
 	ui::debug::initialize(*_renderer.get());
 
 	auto engine = std::make_unique<Engine>(_core.get(), _renderer.get());

@@ -6,7 +6,6 @@
 
 #include <window/window.h>
 #include <renderer.h>
-#include <vulkan/pipeline.h>
 
 #include "object/component.h"
 #include "object/components/transform_component.h"

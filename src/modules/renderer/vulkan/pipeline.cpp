@@ -1,5 +1,6 @@
 #include "pipeline.h"
 #include "utils/shader.h"
+#include <renderer_data.h>
 
 #include "../physics/utils/drawer.h"
 
@@ -19,22 +20,23 @@
 
 pipeline::pipeline()
 {
-	init();
+	//init();
 }
 
 pipeline::~pipeline()
 {
-	cleanup();
+	//cleanup();
 }
 
 void pipeline::init() {
+    LOG_INFO("Initializing vulkan api");
     createInstance();
     validation::setupDebuggerMessenger(instance);
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
 
-    _swapchain = new swapchain(physicalDevice, device, surface);
+    _swapchain = new swapchain(physicalDevice, device->getVkHandle(), surface);
 
     createGBufferResources();
     createDepthResources();
@@ -68,10 +70,10 @@ void pipeline::init() {
 
     createCommandPool();
 
-    allocator = buffers::createVmaAllocator(physicalDevice, device, instance);
+    allocator = buffers::createVmaAllocator(physicalDevice, device->getVkHandle(), instance);
 
-    _vertexBuffer = new buffers::vertexBuffer(device, graphicsQueue, commandPool, allocator);
-    _indexBuffer = new buffers::indexBuffer(device, graphicsQueue, commandPool, allocator);
+    _vertexBuffer = new buffers::vertexBuffer(device->getVkHandle(), graphicsQueue, commandPool, allocator);
+    _indexBuffer = new buffers::indexBuffer(device->getVkHandle(), graphicsQueue, commandPool, allocator);
 
     createDefaultTextures();
 
@@ -81,75 +83,76 @@ void pipeline::init() {
 
 void pipeline::cleanup()
 {
-    vkDeviceWaitIdle(device);
+    LOG_INFO("Shutdown vulkan api");
+    vkDeviceWaitIdle(device->getVkHandle());
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyDescriptorPool(device->getVkHandle(), descriptorPool, nullptr);
     descriptorPool = VK_NULL_HANDLE;
 
-    vkDestroyDescriptorPool(device, materialDescriptorPool, nullptr);
+    vkDestroyDescriptorPool(device->getVkHandle(), materialDescriptorPool, nullptr);
     materialDescriptorPool = VK_NULL_HANDLE;
 
-    vkDestroyImageView(device, gBufferDepthImageView, nullptr);
+    vkDestroyImageView(device->getVkHandle(), gBufferDepthImageView, nullptr);
     gBufferDepthImageView = VK_NULL_HANDLE;
         
-    vkDestroyImage(device, gBufferDepthImage, nullptr);
+    vkDestroyImage(device->getVkHandle(), gBufferDepthImage, nullptr);
     gBufferDepthImage = VK_NULL_HANDLE;
 
-    vkFreeMemory(device, gBufferDepthImageMemory, nullptr);
+    vkFreeMemory(device->getVkHandle(), gBufferDepthImageMemory, nullptr);
     gBufferDepthImageMemory = VK_NULL_HANDLE;
 
 
-    vkDestroyImageView(device, swapchainDepthImageView, nullptr);
+    vkDestroyImageView(device->getVkHandle(), swapchainDepthImageView, nullptr);
     swapchainDepthImageView = VK_NULL_HANDLE;
 
-    vkDestroyImage(device, swapchainDepthImage, nullptr);
+    vkDestroyImage(device->getVkHandle(), swapchainDepthImage, nullptr);
     swapchainDepthImage = VK_NULL_HANDLE;
 
-    vkFreeMemory(device, swapchainDepthImageMemory, nullptr);
+    vkFreeMemory(device->getVkHandle(), swapchainDepthImageMemory, nullptr);
     swapchainDepthImageMemory = VK_NULL_HANDLE;
 
-    vkDestroyImageView(device, gBuffer.albedoView, nullptr);
-    vkDestroyImage(device, gBuffer.albedo, nullptr);
-    vkFreeMemory(device, gBuffer.albedoMem, nullptr);
+    vkDestroyImageView(device->getVkHandle(), gBuffer.albedoView, nullptr);
+    vkDestroyImage(device->getVkHandle(), gBuffer.albedo, nullptr);
+    vkFreeMemory(device->getVkHandle(), gBuffer.albedoMem, nullptr);
 
-    vkDestroyImageView(device, gBuffer.normalView, nullptr);
-    vkDestroyImage(device, gBuffer.normal, nullptr);
-    vkFreeMemory(device, gBuffer.normalMem, nullptr);
+    vkDestroyImageView(device->getVkHandle(), gBuffer.normalView, nullptr);
+    vkDestroyImage(device->getVkHandle(), gBuffer.normal, nullptr);
+    vkFreeMemory(device->getVkHandle(), gBuffer.normalMem, nullptr);
 
-    vkDestroyImageView(device, gBuffer.emissiveView, nullptr);
-    vkDestroyImage(device, gBuffer.emissive, nullptr);
-    vkFreeMemory(device, gBuffer.emissiveMem, nullptr);
+    vkDestroyImageView(device->getVkHandle(), gBuffer.emissiveView, nullptr);
+    vkDestroyImage(device->getVkHandle(), gBuffer.emissive, nullptr);
+    vkFreeMemory(device->getVkHandle(), gBuffer.emissiveMem, nullptr);
 
     delete _swapchain;
 
-    vkDestroyPipeline(device, gBufferPipeline, nullptr);
-    vkDestroyPipeline(device, lightingPipeline, nullptr);
-    vkDestroyPipeline(device, wireframePipeline, nullptr);
+    vkDestroyPipeline(device->getVkHandle(), gBufferPipeline, nullptr);
+    vkDestroyPipeline(device->getVkHandle(), lightingPipeline, nullptr);
+    vkDestroyPipeline(device->getVkHandle(), wireframePipeline, nullptr);
 
-    vkDestroyPipelineLayout(device, gBufferPipelineLayout, nullptr);
-    vkDestroyPipelineLayout(device, lightingPipelineLayout, nullptr);
-    vkDestroyPipelineLayout(device, wireframePipelineLayout, nullptr);
+    vkDestroyPipelineLayout(device->getVkHandle(), gBufferPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(device->getVkHandle(), lightingPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(device->getVkHandle(), wireframePipelineLayout, nullptr);
 
-    vkDestroyRenderPass(device, gBufferRenderPass, nullptr);
+    vkDestroyRenderPass(device->getVkHandle(), gBufferRenderPass, nullptr);
     //vkDestroyRenderPass(device, lightingRenderPass, nullptr);
     //vkDestroyRenderPass(device, wireframeRenderPass, nullptr);
 
-    vkDestroyRenderPass(device, finalRenderPass, nullptr);
+    vkDestroyRenderPass(device->getVkHandle(), finalRenderPass, nullptr);
 
     destroyWireframeBuffers();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer(device->getVkHandle(), uniformBuffers[i], nullptr);
+        vkFreeMemory(device->getVkHandle(), uniformBuffersMemory[i], nullptr);
     }
 
-    vkDestroyDescriptorSetLayout(device, globalDescriptorSetLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, materialDescriptorSetLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, gBufferDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device->getVkHandle(), globalDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device->getVkHandle(), materialDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device->getVkHandle(), gBufferDescriptorSetLayout, nullptr);
 
     cleanupDefaultTextures();
 
@@ -159,14 +162,14 @@ void pipeline::cleanup()
     vmaDestroyAllocator(allocator);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(device, inFlightFences[i], nullptr);
+        vkDestroySemaphore(device->getVkHandle(), renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(device->getVkHandle(), imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(device->getVkHandle(), inFlightFences[i], nullptr);
     }
 
-    vkDestroyCommandPool(device, commandPool, nullptr);
+    vkDestroyCommandPool(device->getVkHandle(), commandPool, nullptr);
 
-    vkDestroyDevice(device, nullptr);
+    vkDestroyDevice(device->getVkHandle(), nullptr);
 
     if (validation::enableValidationLayers) {
         validation::DestroyDebugUtilsMessengerEXT(instance, validation::debugMessenger, nullptr);
@@ -174,6 +177,120 @@ void pipeline::cleanup()
 
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
+}
+
+FrameRenderStatus pipeline::beginFrame()
+{
+    uint32_t currentFrameIndex = getCurrentFrame();
+
+    vkWaitForFences(device->getVkHandle(), 1, &inFlightFences[currentFrameIndex], VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        device->getVkHandle(),
+        getSwapchain()->swapChain,
+        UINT64_MAX,
+        imageAvailableSemaphores[currentFrameIndex],
+        VK_NULL_HANDLE,
+        &imageIndex
+    );
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        return FrameRenderStatus::SwapChainNeedsResize;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        LOG_CRITICAL("Failed to acquire swap chain image");
+        return FrameRenderStatus::Error;
+    }
+
+    currentSwapchainImageIndex = imageIndex;
+
+    vkResetFences(device->getVkHandle(), 1, &inFlightFences[currentFrameIndex]);
+    vkResetCommandBuffer(commandBuffers[currentFrameIndex], 0);
+
+    return FrameRenderStatus::Success;
+}
+
+void pipeline::drawFrame(RenderFrameData& frameData)
+{
+    uint32_t currentFrameIndex = getCurrentFrame();
+    uint32_t imageIndex = currentSwapchainImageIndex;
+
+    glm::mat4 projMatrix = glm::perspective(
+        glm::radians(frameData.cameraFov),
+        (float)getSwapchain()->swapChainExtent.width / (float)getSwapchain()->swapChainExtent.height,
+        frameData.cameraNearPlane,
+        frameData.cameraFarPlane
+    );
+    projMatrix[1][1] *= -1;
+
+    updateUniformBuffer(currentFrameIndex, frameData.viewMatrix, projMatrix, frameData.cameraPosition);
+
+    frameData.globalDescriptorSet = getDescriptorSets()[currentFrameIndex];
+
+    VkExtent2D swapchainExtent = getSwapchain()->swapChainExtent;
+    frameData.viewportWidth = swapchainExtent.width;
+    frameData.viewportHeight = swapchainExtent.height;
+
+    createWireframeBuffers(frameData.physicsDebugVertices, frameData.physicsDebugIndices);
+
+    recordCommandBuffer(
+        commandBuffers[currentFrameIndex],
+        imageIndex,
+        frameData,
+        frameData.renderObjects
+    );
+}
+
+FrameRenderStatus pipeline::endFrame()
+{
+    uint32_t currentFrameIndex = getCurrentFrame();
+    uint32_t imageIndex = currentSwapchainImageIndex;
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrameIndex] };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers[currentFrameIndex];
+
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrameIndex] };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(getGraphicsQueue(), 1, &submitInfo, inFlightFences[currentFrameIndex]) != VK_SUCCESS) {
+        LOG_CRITICAL("Failed to submit draw command buffer");
+        return FrameRenderStatus::Error;
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapchains[] = { getSwapchain()->swapChain };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapchains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    VkResult result = vkQueuePresentKHR(getPresentQueue(), &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        return FrameRenderStatus::SwapChainNeedsResize;
+    }
+    else if (result != VK_SUCCESS) {
+        LOG_CRITICAL("Failed to present swap chain image");
+        return FrameRenderStatus::Error;
+    }
+
+    setCurrentFrame((currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT);
+
+    return FrameRenderStatus::Success;
 }
 
 void pipeline::createDescriptorPool()
@@ -207,7 +324,7 @@ void pipeline::createDescriptorPool()
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
 
-    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(device->getVkHandle(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create hybrid descriptor pool");
     }
 }
@@ -232,23 +349,23 @@ void pipeline::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemor
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(device->getVkHandle(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create buffer");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(device->getVkHandle(), buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(device->getVkHandle(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
         LOG_CRITICAL("failed to allocate buffer memory");
     }
 
-    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    vkBindBufferMemory(device->getVkHandle(), buffer, bufferMemory, 0);
 }
 
 void pipeline::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
@@ -259,7 +376,7 @@ void pipeline::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+    vkAllocateCommandBuffers(device->getVkHandle(), &allocInfo, &commandBuffer);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -283,7 +400,7 @@ void pipeline::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
     vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(graphicsQueue);
 
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    vkFreeCommandBuffers(device->getVkHandle(), commandPool, 1, &commandBuffer);
 }
 
 void pipeline::createUniformBuffers()
@@ -297,8 +414,16 @@ void pipeline::createUniformBuffers()
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
 
-        vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+        vkMapMemory(device->getVkHandle(), uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
     }
+}
+
+void pipeline::notifyWindowResized()
+{
+    getSwapchain()->recreateSwapChain(
+        getFinalRenderPass(),
+        getSwapchainDepthImageView()
+    );
 }
 
 void pipeline::updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj, glm::vec3 cameraPos) {
@@ -330,7 +455,7 @@ void pipeline::createDescriptorSetLayout()
     globalLayoutInfo.bindingCount = 1;
     globalLayoutInfo.pBindings = &globalUboBinding;
 
-    if (vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &globalDescriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device->getVkHandle(), &globalLayoutInfo, nullptr, &globalDescriptorSetLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create global descriptor set layout!");
     }
 
@@ -372,7 +497,7 @@ void pipeline::createDescriptorSetLayout()
     materialLayoutCreateInfo.bindingCount = static_cast<uint32_t>(materialBindings.size());
     materialLayoutCreateInfo.pBindings = materialBindings.data();
 
-    if (vkCreateDescriptorSetLayout(device, &materialLayoutCreateInfo, nullptr, &materialDescriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device->getVkHandle(), &materialLayoutCreateInfo, nullptr, &materialDescriptorSetLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create material descriptor set layout!");
     }
 }
@@ -386,7 +511,7 @@ void pipeline::createGlobalDescriptorSet() {
     allocInfo.pSetLayouts = layouts.data();
 
     descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device->getVkHandle(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
         LOG_CRITICAL("failed to allocate descriptor sets");
     }
 
@@ -407,7 +532,7 @@ void pipeline::createGlobalDescriptorSet() {
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &uboBufferInfo;
 
-        vkUpdateDescriptorSets(device,
+        vkUpdateDescriptorSets(device->getVkHandle(),
             static_cast<uint32_t>(descriptorWrites.size()),
             descriptorWrites.data(),
             0,
@@ -429,7 +554,7 @@ void pipeline::createMaterialDescriptorPool() {
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
 
-    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &materialDescriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(device->getVkHandle(), &poolInfo, nullptr, &materialDescriptorPool) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to create material descriptor pool!");
     }
     else {
@@ -481,7 +606,7 @@ void pipeline::createGBufferSampler() {
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 1.0f;
 
-    if (vkCreateSampler(device, &samplerInfo, nullptr, &gBufferSampler) != VK_SUCCESS) {
+    if (vkCreateSampler(device->getVkHandle(), &samplerInfo, nullptr, &gBufferSampler) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create G-Buffer sampler!");
     }
 }
@@ -516,29 +641,29 @@ void pipeline::createWireframeBuffers(const std::vector<DebugLineVertex>& vertic
     createBuffer(vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, wireframeVertexBuffer, wireframeVertexMemory);
 
     void* data;
-    vkMapMemory(device, wireframeVertexMemory, 0, vertexBufferSize, 0, &data);
+    vkMapMemory(device->getVkHandle(), wireframeVertexMemory, 0, vertexBufferSize, 0, &data);
     memcpy(data, vertices.data(), (size_t)vertexBufferSize);
-    vkUnmapMemory(device, wireframeVertexMemory);
+    vkUnmapMemory(device->getVkHandle(), wireframeVertexMemory);
 
     VkDeviceSize indexBufferSize = sizeof(uint32_t) * indices.size();
     createBuffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, wireframeIndexBuffer, wireframeIndexMemory);
 
-    vkMapMemory(device, wireframeIndexMemory, 0, indexBufferSize, 0, &data);
+    vkMapMemory(device->getVkHandle(), wireframeIndexMemory, 0, indexBufferSize, 0, &data);
     memcpy(data, indices.data(), (size_t)indexBufferSize);
-    vkUnmapMemory(device, wireframeIndexMemory);
+    vkUnmapMemory(device->getVkHandle(), wireframeIndexMemory);
 }
 
 void pipeline::destroyWireframeBuffers()
 {
     if (wireframeVertexBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device, wireframeVertexBuffer, nullptr);
-        vkFreeMemory(device, wireframeVertexMemory, nullptr);
+        vkDestroyBuffer(device->getVkHandle(), wireframeVertexBuffer, nullptr);
+        vkFreeMemory(device->getVkHandle(), wireframeVertexMemory, nullptr);
         wireframeVertexBuffer = VK_NULL_HANDLE;
         wireframeVertexMemory = VK_NULL_HANDLE;
     }
     if (wireframeIndexBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device, wireframeIndexBuffer, nullptr);
-        vkFreeMemory(device, wireframeIndexMemory, nullptr);
+        vkDestroyBuffer(device->getVkHandle(), wireframeIndexBuffer, nullptr);
+        vkFreeMemory(device->getVkHandle(), wireframeIndexMemory, nullptr);
         wireframeIndexBuffer = VK_NULL_HANDLE;
         wireframeIndexMemory = VK_NULL_HANDLE;
     }
@@ -561,7 +686,7 @@ void pipeline::createGBufferFramebuffer() {
     framebufferInfo.height = _swapchain->swapChainExtent.height;
     framebufferInfo.layers = 1;
 
-    if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &gBufferFramebuffer) != VK_SUCCESS) {
+    if (vkCreateFramebuffer(device->getVkHandle(), &framebufferInfo, nullptr, &gBufferFramebuffer) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create G-Buffer framebuffer!");
     }
 }
@@ -598,7 +723,7 @@ void pipeline::createGBufferDescriptorSetLayout() {
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
 
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &gBufferDescriptorSetLayout) != VK_SUCCESS) {
+    if (vkCreateDescriptorSetLayout(device->getVkHandle(), &layoutInfo, nullptr, &gBufferDescriptorSetLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create G-Buffer descriptor set layout!");
     }
 }
@@ -610,7 +735,7 @@ void pipeline::createGBufferDescriptorSet() {
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &gBufferDescriptorSetLayout;
 
-    if (vkAllocateDescriptorSets(device, &allocInfo, &gBufferDescriptorSet) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device->getVkHandle(), &allocInfo, &gBufferDescriptorSet) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to allocate G-Buffer descriptor set!");
     }
 
@@ -672,7 +797,7 @@ void pipeline::createGBufferDescriptorSet() {
     descriptorWrites[3].descriptorCount = 1;
     descriptorWrites[3].pImageInfo = &depthInfo;
 
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(device->getVkHandle(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void pipeline::createInstance()
@@ -806,12 +931,12 @@ void pipeline::createLogicalDevice()
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+    if (vkCreateDevice(physicalDevice, &createInfo, nullptr, device->getVkHandlePtr()) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(device->getVkHandle(), indices.graphicsFamily.value(), 0, &graphicsQueue);
+    vkGetDeviceQueue(device->getVkHandle(), indices.presentFamily.value(), 0, &presentQueue);
 }
 
 void pipeline::createSurface()
@@ -861,23 +986,23 @@ void pipeline::createImage(uint32_t width, uint32_t height, VkFormat format,
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
+    if (vkCreateImage(device->getVkHandle(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create image!");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(device, image, &memRequirements);
+    vkGetImageMemoryRequirements(device->getVkHandle(), image, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(device->getVkHandle(), &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
         LOG_CRITICAL("failed to allocate image memory!");
     }
 
-    vkBindImageMemory(device, image, imageMemory, 0);
+    vkBindImageMemory(device->getVkHandle(), image, imageMemory, 0);
 }
 
 void pipeline::createDepthResources() {
@@ -960,7 +1085,7 @@ void pipeline::createGBufferRenderPass()
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &gBufferRenderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device->getVkHandle(), &renderPassInfo, nullptr, &gBufferRenderPass) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create gBuffer render pass");
     }
 }
@@ -1234,13 +1359,13 @@ void pipeline::createFinalRenderPass()
     renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
     renderPassInfo.pDependencies = dependencies.data();
 
-    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &finalRenderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device->getVkHandle(), &renderPassInfo, nullptr, &finalRenderPass) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create final render pass");
     }
 }
 
 void pipeline::createGBufferPipeline() {
-    utils::shader myShader(device, "shaders/g_buffer.vert.spv", "shaders/g_buffer.frag.spv");
+    utils::shader myShader(device->getVkHandle(), "shaders/g_buffer.vert.spv", "shaders/g_buffer.frag.spv");
     const auto& shaderStages = myShader.getShaderStages();
 
     VkVertexInputBindingDescription vertexBindingDescription = vertex::getBindingDescription();
@@ -1317,7 +1442,7 @@ void pipeline::createGBufferPipeline() {
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &gBufferPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device->getVkHandle(), &pipelineLayoutInfo, nullptr, &gBufferPipelineLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create pipeline layout!");
     }
 
@@ -1348,14 +1473,14 @@ void pipeline::createGBufferPipeline() {
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &gBufferPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->getVkHandle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &gBufferPipeline) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create G-Buffer pipeline");
     }
 }
 
 void pipeline::createLightingPipeline()
 {
-    utils::shader myShader(device, "shaders/lighting.vert.spv", "shaders/lighting.frag.spv");
+    utils::shader myShader(device->getVkHandle(), "shaders/lighting.vert.spv", "shaders/lighting.frag.spv");
     const auto& shaderStages = myShader.getShaderStages();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -1420,7 +1545,7 @@ void pipeline::createLightingPipeline()
     pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &lightingPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device->getVkHandle(), &pipelineLayoutInfo, nullptr, &lightingPipelineLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create lighting pipeline layout!");
     }
 
@@ -1451,14 +1576,14 @@ void pipeline::createLightingPipeline()
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &lightingPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->getVkHandle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &lightingPipeline) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create lighting pipeline");
     }
 }
 
 void pipeline::createWireframePipeline()
 {
-    utils::shader debugWireframeShader(device, "shaders/debug_wireframe.vert.spv", "shaders/debug_wireframe.frag.spv");
+    utils::shader debugWireframeShader(device->getVkHandle(), "shaders/debug_wireframe.vert.spv", "shaders/debug_wireframe.frag.spv");
     const auto& shaderStages = debugWireframeShader.getShaderStages();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -1531,7 +1656,7 @@ void pipeline::createWireframePipeline()
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &wireframePipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device->getVkHandle(), &pipelineLayoutInfo, nullptr, &wireframePipelineLayout) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create debug wireframe pipeline layout!");
     }
 
@@ -1560,7 +1685,7 @@ void pipeline::createWireframePipeline()
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->getVkHandle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create debug wireframe pipeline");
     }
 }
@@ -1573,7 +1698,7 @@ VkShaderModule pipeline::createShaderModule(const std::vector<char>& code)
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
     VkShaderModule shaderModule;
-    if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+    if (vkCreateShaderModule(device->getVkHandle(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create shader module");
     }
 
@@ -1589,7 +1714,7 @@ void pipeline::createCommandPool()
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
 
-    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+    if (vkCreateCommandPool(device->getVkHandle(), &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create command pool");
     }
 }
@@ -1604,7 +1729,7 @@ void pipeline::createCommandBuffer()
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
-    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(device->getVkHandle(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
         LOG_CRITICAL("failed to allocate command buffers");
     }
 }
@@ -1623,9 +1748,9 @@ void pipeline::createSyncObjects()
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+        if (vkCreateSemaphore(device->getVkHandle(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(device->getVkHandle(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(device->getVkHandle(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
 
             LOG_CRITICAL("failed to create synchronization objects for a frame");
         }
@@ -1859,7 +1984,7 @@ MaterialInstance* pipeline::getOrCreateMaterialInstance(Material& material)
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &materialDescriptorSetLayout;
 
-    if (vkAllocateDescriptorSets(device, &allocInfo, &newInstance->descriptorSet) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device->getVkHandle(), &allocInfo, &newInstance->descriptorSet) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to allocate descriptor sets (Create Material Instance)");
     }
 
@@ -1912,7 +2037,7 @@ MaterialInstance* pipeline::getOrCreateMaterialInstance(Material& material)
     descriptorWrites[4].descriptorCount = 1;
     descriptorWrites[4].pImageInfo = &defaultAoTextureInfo;
 
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(device->getVkHandle(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
     MaterialInstance* ptr = newInstance.get();
     materialCache[material.name] = std::move(newInstance);
@@ -1989,7 +2114,7 @@ void pipeline::createSingleDefaultTexture(
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+    if (vkCreateImageView(device->getVkHandle(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to create image view for default texture!");
     }
 }
@@ -2013,7 +2138,7 @@ void pipeline::createDefaultSampler(VkSampler& sampler) {
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;
 
-    if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
+    if (vkCreateSampler(device->getVkHandle(), &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to create default sampler!");
     }
 }
@@ -2045,20 +2170,20 @@ void pipeline::createDefaultTextures() {
 }
 
 void pipeline::cleanupDefaultTextures() {
-    vkDestroySampler(device, defaultAlbedoSampler, nullptr);
-    vkDestroyImageView(device, defaultAlbedoImageView, nullptr);
+    vkDestroySampler(device->getVkHandle(), defaultAlbedoSampler, nullptr);
+    vkDestroyImageView(device->getVkHandle(), defaultAlbedoImageView, nullptr);
     vmaDestroyImage(allocator, defaultAlbedoImage, defaultAlbedoImageAllocation);
 
-    vkDestroySampler(device, defaultNormalSampler, nullptr);
-    vkDestroyImageView(device, defaultNormalImageView, nullptr);
+    vkDestroySampler(device->getVkHandle(), defaultNormalSampler, nullptr);
+    vkDestroyImageView(device->getVkHandle(), defaultNormalImageView, nullptr);
     vmaDestroyImage(allocator, defaultNormalImage, defaultNormalImageAllocation);
 
-    vkDestroySampler(device, defaultMetallicRoughnessSampler, nullptr);
-    vkDestroyImageView(device, defaultMetallicRoughnessImageView, nullptr);
+    vkDestroySampler(device->getVkHandle(), defaultMetallicRoughnessSampler, nullptr);
+    vkDestroyImageView(device->getVkHandle(), defaultMetallicRoughnessImageView, nullptr);
     vmaDestroyImage(allocator, defaultMetallicRoughnessImage, defaultMetallicRoughnessImageAllocation);
 
-    vkDestroySampler(device, defaultAoSampler, nullptr);
-    vkDestroyImageView(device, defaultAoImageView, nullptr);
+    vkDestroySampler(device->getVkHandle(), defaultAoSampler, nullptr);
+    vkDestroyImageView(device->getVkHandle(), defaultAoImageView, nullptr);
     vmaDestroyImage(allocator, defaultAoImage, defaultAoImageAllocation);
 }
 
@@ -2102,7 +2227,7 @@ VkCommandBuffer pipeline::beginSingleTimeCommands() {
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+    vkAllocateCommandBuffers(device->getVkHandle(), &allocInfo, &commandBuffer);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -2123,7 +2248,7 @@ void pipeline::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(graphicsQueue);
 
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    vkFreeCommandBuffers(device->getVkHandle(), commandPool, 1, &commandBuffer);
 }
 
 void pipeline::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer) {
