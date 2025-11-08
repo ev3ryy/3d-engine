@@ -1,6 +1,8 @@
 #ifndef SCENE_WORLD_H
 #define SCENE_WORLD_H
 
+#include <glm/glm.hpp>
+
 #include <vector>
 #include <unordered_map>
 #include <memory>
@@ -45,12 +47,21 @@ public:
 
 	void setActiveRenderCamera(const Camera* cam);
 
+	const glm::vec3& getSunDirection() const { return m_sunDirection; }
+	void setSunDirection(const glm::vec3& dir) { m_sunDirection = dir; }
+
+	float getSunIntensity() const { return m_sunIntensity; }
+	void setSunIntensity(float intensity) { m_sunIntensity = intensity; }
+
 	//std::vector<Object*> getRenderableObjects() const;
 
 	void update(float deltaTime);
 	void clear();
 
 private:
+	glm::vec3 m_sunDirection{ -1.0f, -1.0f, -0.5f };
+	float m_sunIntensity = 100.0f;
+
 	std::vector<std::unique_ptr<Object>> objects;
 
 	// fast access

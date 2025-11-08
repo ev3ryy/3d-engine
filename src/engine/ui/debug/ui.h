@@ -7,7 +7,7 @@ class World;
 namespace ui {
 	class debug {
 	public:
-		static void initialize(renderer& _renderer);
+		//static void initialize(renderer& _renderer);
 		static void drawDebugMenu(World& world, renderer& renderer);
 	};
 }

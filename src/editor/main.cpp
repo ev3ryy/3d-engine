@@ -49,7 +49,10 @@ int main() {
 	auto _core = std::make_unique<core>();
 	auto _renderer = std::make_unique<renderer>();
 
-	ui::debug::initialize(*_renderer.get());
+    _renderer->init();
+
+	//ui::debug::initialize(*_renderer.get());
+    _renderer->getPipeline()->imguiInitialize();
 
 	auto engine = std::make_unique<Engine>(_core.get(), _renderer.get());
 

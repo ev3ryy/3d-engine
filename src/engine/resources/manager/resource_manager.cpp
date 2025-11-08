@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <renderer.h>
-#include <vulkan/pipeline.h>
 
 #include <logs.h>
 

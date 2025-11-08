@@ -11,11 +11,12 @@
 #include <vulkan/imgui_impl_glfw.h>
 #include <vulkan/imgui_impl_vulkan.h>
 
+#include <window/window.h>
+
 #include <core.h>
 #include <renderer.h>
 #include <input.h>
 #include <logger.h>
-#include <vulkan/pipeline.h>
 #include <camera/camera.h>
 #include <mesh/primitives/primitives.h>
 

@@ -3,8 +3,10 @@
 
 #include <glm/glm.hpp>
 
+#include <irenderer.h>
+#include <shaders/shader_manager.h>
+
 class window;
-class pipeline;
 class World;
 class Mesh;
 class MaterialInstance;
@@ -19,20 +21,25 @@ public:
 	renderer();
 	~renderer();
 
+	void init();
+	void shutdown();
+
 	void render(const World& world, ResourceManager& resourceManager, float alpha, PhysicsWorld* physicsWorld);
 	void waitDeviceIdle() const;
 
-	void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, pipeline* pipeline, float interpolationAlpha);
+	void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, float interpolationAlpha);
 	void syncWithWorld(const World& world, ResourceManager& resourceManager, float interpolationAlpha);
 
-	pipeline* getPipeline() const { return _pipeline; }
+	void uploadMesh(Mesh* mesh);
+
+	IPipeline* getPipeline() const { return pipeline; }
 
 private:
-	void init();
-
 	window* _window;
-	pipeline* _pipeline;
+	IPipeline* pipeline = nullptr;
 	std::vector<RenderObject> _renderObjects;
+
+	std::unique_ptr<ShaderManager> shaderManager;
 };
 
 #endif // RENDERER_RENDERER_H
