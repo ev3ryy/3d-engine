@@ -52,9 +52,11 @@ if(NOT EXISTS ${DXC_EXECUTABLE})
     message(FATAL_ERROR "Dxc compiler not found! Please ensure the executable for the current platform is placed at ${DXC_EXECUTABLE}")
 endif()
 
+if(NOT MSVC)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
 add_compile_options(-Wno-error)
 add_compile_options(-Wno-reorder-ctor)
+endif()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
 
@@ -64,7 +66,9 @@ set(BUILD_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
+if(NOT MSVC)
 set_target_properties(assimp PROPERTIES COMPILE_FLAGS "-Wno-error -Wno-character-conversion")
+endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/bullet3 EXCLUDE_FROM_ALL)
 
 find_package(Vulkan REQUIRED)
