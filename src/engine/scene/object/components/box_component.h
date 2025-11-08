@@ -2,9 +2,7 @@
 #define BOX_COMPONENT_H
 
 #include "collider_component.h"
-#include "rigidbody_component.h"
 
-#include <glm/glm.hpp>
 #include <logs.h>
 
 class BoxComponent : public ColliderComponent {

@@ -74,7 +74,7 @@ void swapchain::createSwapChain()
     swapChainExtent = extent;
 }
 
-void swapchain::recreateSwapChain() {
+void swapchain::recreateSwapChain(VkRenderPass renderPass, VkImageView depthImageView) {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window::_window, &width, &height);
     while (width == 0 || height == 0) {
@@ -88,10 +88,16 @@ void swapchain::recreateSwapChain() {
 
     createSwapChain();
     createImageViews();
+
+    createFramebuffers(renderPass, depthImageView);
 }
 
 void swapchain::cleanupSwapChain()
 {
+    for (auto framebuffer : swapChainFramebuffers) {
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
     for (auto imageView : swapChainImageViews) {
         vkDestroyImageView(device, imageView, nullptr);
     }
@@ -194,29 +200,29 @@ VkExtent2D swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilit
     }
 }
 
-//void swapchain::createFramebuffers(VkRenderPass renderPass, VkImageView depthImageView) {
-//    swapChainFramebuffers.resize(swapChainImageViews.size());
-//
-//    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-//        std::array<VkImageView, 2> attachments = {
-//            swapChainImageViews[i],
-//            depthImageView
-//        };
-//
-//        VkFramebufferCreateInfo framebufferInfo{};
-//        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-//        framebufferInfo.renderPass = renderPass;
-//        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-//        framebufferInfo.pAttachments = attachments.data();
-//        framebufferInfo.width = swapChainExtent.width;
-//        framebufferInfo.height = swapChainExtent.height;
-//        framebufferInfo.layers = 1;
-//
-//        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-//            LOG_CRITICAL("failed to create framebuffer");
-//        }
-//    }
-//}
+void swapchain::createFramebuffers(VkRenderPass renderPass, VkImageView depthImageView) {
+    swapChainFramebuffers.resize(swapChainImageViews.size());
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        std::array<VkImageView, 2> attachments = {
+            swapChainImageViews[i],
+            depthImageView
+        };
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
+        framebufferInfo.width = swapChainExtent.width;
+        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+            LOG_CRITICAL("failed to create framebuffer");
+        }
+    }
+}
 
 VkImageView swapchain::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
     VkImageViewCreateInfo viewInfo{};
@@ -235,18 +241,4 @@ VkImageView swapchain::createImageView(VkImage image, VkFormat format, VkImageAs
         LOG_CRITICAL("failed to create image view!");
     }
     return imageView;
-}
-
-VkImage swapchain::getImage(uint32_t index) const {
-    if (index >= swapChainImages.size()) {
-        LOG_CRITICAL("Swapchain image index out of bounds!");
-    }
-    return swapChainImages[index];
-}
-
-VkImageView swapchain::getImageView(uint32_t index) const {
-    if (index >= swapChainImageViews.size()) {
-        LOG_CRITICAL("Swapchain image view index out of bounds!");
-    }
-    return swapChainImageViews[index];
 }

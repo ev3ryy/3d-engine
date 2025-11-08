@@ -43,10 +43,14 @@ void pipeline::init() {
     createDescriptorSetLayout();
     createGBufferDescriptorSetLayout();
 
-    //createGBufferRenderPass();
-    //createFinalRenderPass();
+    createGBufferRenderPass();
+    //createLightingRenderPass();
+    //createWireframeRenderPass();
+    //createImGuiRenderPass();
 
-    //createGBufferFramebuffer();
+    createFinalRenderPass();
+
+    createGBufferFramebuffer();
 
     createDescriptorPool();
     createMaterialDescriptorPool();
@@ -60,7 +64,7 @@ void pipeline::init() {
     createLightingPipeline();
     createWireframePipeline();
 
-    //_swapchain->createFramebuffers(finalRenderPass, swapchainDepthImageView);
+    _swapchain->createFramebuffers(finalRenderPass, swapchainDepthImageView);
 
     createCommandPool();
 
@@ -130,8 +134,11 @@ void pipeline::cleanup()
     vkDestroyPipelineLayout(device, lightingPipelineLayout, nullptr);
     vkDestroyPipelineLayout(device, wireframePipelineLayout, nullptr);
 
-    //vkDestroyRenderPass(device, gBufferRenderPass, nullptr);
-    //vkDestroyRenderPass(device, finalRenderPass, nullptr);
+    vkDestroyRenderPass(device, gBufferRenderPass, nullptr);
+    //vkDestroyRenderPass(device, lightingRenderPass, nullptr);
+    //vkDestroyRenderPass(device, wireframeRenderPass, nullptr);
+
+    vkDestroyRenderPass(device, finalRenderPass, nullptr);
 
     destroyWireframeBuffers();
 
@@ -537,27 +544,27 @@ void pipeline::destroyWireframeBuffers()
     }
 }
 
-//void pipeline::createGBufferFramebuffer() {
-//    std::array<VkImageView, 4> attachments = {
-//        gBuffer.albedoView,
-//        gBuffer.normalView,
-//        gBuffer.emissiveView,
-//        gBufferDepthImageView
-//    };
-//
-//    VkFramebufferCreateInfo framebufferInfo{};
-//    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-//    framebufferInfo.renderPass = gBufferRenderPass;
-//    framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-//    framebufferInfo.pAttachments = attachments.data();
-//    framebufferInfo.width = _swapchain->swapChainExtent.width;
-//    framebufferInfo.height = _swapchain->swapChainExtent.height;
-//    framebufferInfo.layers = 1;
-//
-//    if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &gBufferFramebuffer) != VK_SUCCESS) {
-//        LOG_CRITICAL("failed to create G-Buffer framebuffer!");
-//    }
-//}
+void pipeline::createGBufferFramebuffer() {
+    std::array<VkImageView, 4> attachments = {
+        gBuffer.albedoView,
+        gBuffer.normalView,
+        gBuffer.emissiveView,
+        gBufferDepthImageView
+    };
+
+    VkFramebufferCreateInfo framebufferInfo{};
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = gBufferRenderPass;
+    framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    framebufferInfo.pAttachments = attachments.data();
+    framebufferInfo.width = _swapchain->swapChainExtent.width;
+    framebufferInfo.height = _swapchain->swapChainExtent.height;
+    framebufferInfo.layers = 1;
+
+    if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &gBufferFramebuffer) != VK_SUCCESS) {
+        LOG_CRITICAL("failed to create G-Buffer framebuffer!");
+    }
+}
 
 void pipeline::createGBufferDescriptorSetLayout() {
     std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
@@ -745,15 +752,13 @@ bool pipeline::isDeviceSuitable(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices = QueueFamily::findQueueFamilies(device, surface);
 
-    bool extensionsSupported = checkDeviceExtensionsSupport(device);
-
     bool swapChainAdequate = false;
-    if (extensionsSupported) {
-        SwapChainSupportDetails swapChainSupport = swapchain::querySwapChainSupport(device, surface);
+    if (checkDeviceExtensionsSupport(device)) {
+        SwapChainSupportDetails swapChainSupport = _swapchain->querySwapChainSupport(device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    return indices.isComplete() && checkDeviceExtensionsSupport(device) && swapChainAdequate;
 }
 
 void pipeline::createLogicalDevice()
@@ -790,18 +795,16 @@ void pipeline::createLogicalDevice()
     deviceFeatures.samplerAnisotropy = VK_TRUE;
     deviceFeatures.wideLines = VK_TRUE;
 
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeature{};
-    dynamicRenderingFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
-    dynamicRenderingFeature.dynamicRendering = VK_TRUE;
-
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
     createInfo.pEnabledFeatures = &deviceFeatures;
+
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-    createInfo.pNext = &dynamicRenderingFeature;
 
     if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
         LOG_CRITICAL("failed to create logical device!");
@@ -890,63 +893,114 @@ void pipeline::createDepthResources() {
     gBufferDepthImageView = _swapchain->createImageView(gBufferDepthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-//void pipeline::createGBufferRenderPass()
+void pipeline::createGBufferRenderPass()
+{
+    std::array<VkAttachmentDescription, 4> attachments{};
+    attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // normal
+    attachments[1] = attachments[0];
+    attachments[1].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // emmisive / ao
+    attachments[2] = attachments[0];
+    attachments[2].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // depth
+    attachments[3].format = findDepthFormat();
+    attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    std::array<VkAttachmentReference, 3> colorReferences;
+    colorReferences[0] = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    colorReferences[1] = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    colorReferences[2] = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+    VkAttachmentReference depthReference = { 3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 3;
+    subpass.pColorAttachments = colorReferences.data();
+    subpass.pDepthStencilAttachment = &depthReference;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+    //std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassInfo.pAttachments = attachments.data();
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &gBufferRenderPass) != VK_SUCCESS) {
+        LOG_CRITICAL("failed to create gBuffer render pass");
+    }
+}
+
+//void pipeline::createLightingRenderPass()
 //{
-//    std::array<VkAttachmentDescription, 4> attachments{};
-//    attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+//    std::array<VkAttachmentDescription, 2> attachments = {};
+//
+//    // color (swapchain)
+//    attachments[0].format = _swapchain->swapChainImageFormat;
 //    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 //    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 //    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 //    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-//    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//
-//    // normal
-//    attachments[1] = attachments[0];
-//    attachments[1].format = VK_FORMAT_R16G16B16A16_SFLOAT;
-//    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-//    attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//
-//    // emmisive / ao
-//    attachments[2] = attachments[0];
-//    attachments[2].format = VK_FORMAT_R16G16B16A16_SFLOAT;
-//    attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//    attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-//    attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+//    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 //
 //    // depth
-//    attachments[3].format = findDepthFormat();
-//    attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
-//    attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-//    attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//    attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-//    attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//    attachments[1].format = findDepthFormat();
+//    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+//    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+//    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+//    attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+//    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 //
-//    std::array<VkAttachmentReference, 3> colorReferences;
-//    colorReferences[0] = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-//    colorReferences[1] = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-//    colorReferences[2] = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+//    VkAttachmentReference colorRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+//    VkAttachmentReference depthRef = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
 //
-//    VkAttachmentReference depthReference = { 3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
-//
-//    VkSubpassDescription subpass{};
+//    VkSubpassDescription subpass = {};
 //    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-//    subpass.colorAttachmentCount = 3;
-//    subpass.pColorAttachments = colorReferences.data();
-//    subpass.pDepthStencilAttachment = &depthReference;
+//    subpass.colorAttachmentCount = 1;
+//    subpass.pColorAttachments = &colorRef;
+//    //subpass.pDepthStencilAttachment = &depthRef;
 //
 //    VkSubpassDependency dependency{};
 //    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 //    dependency.dstSubpass = 0;
-//    dependency.srcStageMask =
-//        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+//    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 //    dependency.srcAccessMask = 0;
-//    dependency.dstStageMask =
-//        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-//    dependency.dstAccessMask =
-//        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-//
-//    //std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+//    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 //
 //    VkRenderPassCreateInfo renderPassInfo{};
 //    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -957,121 +1011,233 @@ void pipeline::createDepthResources() {
 //    renderPassInfo.dependencyCount = 1;
 //    renderPassInfo.pDependencies = &dependency;
 //
-//    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &gBufferRenderPass) != VK_SUCCESS) {
-//        LOG_CRITICAL("failed to create gBuffer render pass");
+//    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &lightingRenderPass) != VK_SUCCESS) {
+//        LOG_CRITICAL("failed to create lighting render pass");
 //    }
 //}
-
-//void pipeline::createFinalRenderPass()
+//
+//void pipeline::createWireframeRenderPass()
 //{
 //    VkAttachmentDescription colorAttachment{};
 //    colorAttachment.format = _swapchain->swapChainImageFormat;
 //    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-//    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+//    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 //    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+//    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 //    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 //
 //    VkAttachmentDescription depthAttachment{};
 //    depthAttachment.format = findDepthFormat();
 //    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-//    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+//    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 //    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+//    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 //    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 //
+//    VkAttachmentReference colorAttachmentRef{};
+//    colorAttachmentRef.attachment = 0;
+//    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+//
+//    VkAttachmentReference depthAttachmentRef{};
+//    depthAttachmentRef.attachment = 1;
+//    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//
+//    VkSubpassDescription subpass{};
+//    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+//    subpass.colorAttachmentCount = 1;
+//    subpass.pColorAttachments = &colorAttachmentRef;
+//    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+//
+//    VkSubpassDependency dependency{};
+//    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+//    dependency.dstSubpass = 0;
+//    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//
 //    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
-//
-//    // lighting subpass
-//    VkAttachmentReference colorAttachmentRefLighting{};
-//    colorAttachmentRefLighting.attachment = 0;
-//    colorAttachmentRefLighting.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//
-//    VkAttachmentReference depthAttachmentRefLighting{};
-//    depthAttachmentRefLighting.attachment = 1;
-//    depthAttachmentRefLighting.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-//
-//    VkSubpassDescription lightingSubpass{};
-//    lightingSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-//    lightingSubpass.colorAttachmentCount = 1;
-//    lightingSubpass.pColorAttachments = &colorAttachmentRefLighting;
-//    lightingSubpass.pDepthStencilAttachment = &depthAttachmentRefLighting;
-//
-//    // wireframe subpass
-//    VkAttachmentReference colorAttachmentRefWireframe{};
-//    colorAttachmentRefWireframe.attachment = 0;
-//    colorAttachmentRefWireframe.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//
-//    VkAttachmentReference depthAttachmentRefWireframe{};
-//    depthAttachmentRefWireframe.attachment = 1;
-//    depthAttachmentRefWireframe.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-//
-//    VkSubpassDescription wireframeSubpass{};
-//    wireframeSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-//    wireframeSubpass.colorAttachmentCount = 1;
-//    wireframeSubpass.pColorAttachments = &colorAttachmentRefWireframe;
-//    wireframeSubpass.pDepthStencilAttachment = &depthAttachmentRefWireframe;
-//
-//    // imgui subpass
-//    VkAttachmentReference colorAttachmentRefImGui{};
-//    colorAttachmentRefImGui.attachment = 0;
-//    colorAttachmentRefImGui.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//
-//    VkAttachmentReference depthAttachmentRefImGui{};
-//    depthAttachmentRefImGui.attachment = 1;
-//    depthAttachmentRefImGui.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-//
-//    VkSubpassDescription imguiSubpass{};
-//    imguiSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-//    imguiSubpass.colorAttachmentCount = 1;
-//    imguiSubpass.pColorAttachments = &colorAttachmentRefImGui;
-//    imguiSubpass.pDepthStencilAttachment = &depthAttachmentRefImGui;
-//
-//    std::array<VkSubpassDescription, 3> subpasses = { lightingSubpass, wireframeSubpass, imguiSubpass };
-//
-//    std::array<VkSubpassDependency, 3> dependencies{};
-//
-//    // external -> lighting
-//    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-//    dependencies[0].dstSubpass = 0;
-//    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-//    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-//    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-//    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-//    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-//
-//    // lighting -> wireframe
-//    dependencies[1].srcSubpass = 0;
-//    dependencies[1].dstSubpass = 1;
-//    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-//    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-//    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-//    dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-//    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-//
-//    // wireframe -> imgui
-//    dependencies[2].srcSubpass = 1;
-//    dependencies[2].dstSubpass = 2;
-//    dependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-//    dependencies[2].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-//    dependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-//    dependencies[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-//    dependencies[2].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-//
 //
 //    VkRenderPassCreateInfo renderPassInfo{};
 //    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 //    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 //    renderPassInfo.pAttachments = attachments.data();
-//    renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
-//    renderPassInfo.pSubpasses = subpasses.data();
-//    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-//    renderPassInfo.pDependencies = dependencies.data();
+//    renderPassInfo.subpassCount = 1;
+//    renderPassInfo.pSubpasses = &subpass;
+//    renderPassInfo.dependencyCount = 1;
+//    renderPassInfo.pDependencies = &dependency;
 //
-//    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &finalRenderPass) != VK_SUCCESS) {
-//        LOG_CRITICAL("failed to create final render pass");
+//    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &wireframeRenderPass) != VK_SUCCESS) {
+//        LOG_CRITICAL("failed to create wireframe render pass");
 //    }
 //}
+//
+//void pipeline::createImGuiRenderPass()
+//{
+//    VkAttachmentDescription colorAttachment{};
+//    colorAttachment.format = _swapchain->swapChainImageFormat;
+//    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+//    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+//    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+//    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+//    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+//
+//    VkAttachmentDescription depthAttachment{};
+//    depthAttachment.format = findDepthFormat();
+//    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+//    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+//    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+//    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+//    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+//
+//    VkAttachmentReference colorAttachmentRef{};
+//    colorAttachmentRef.attachment = 0;
+//    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+//
+//    VkAttachmentReference depthAttachmentRef{};
+//    depthAttachmentRef.attachment = 1;
+//    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//
+//    VkSubpassDescription subpass{};
+//    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+//    subpass.colorAttachmentCount = 1;
+//    subpass.pColorAttachments = &colorAttachmentRef;
+//    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+//
+//    VkSubpassDependency dependency{};
+//    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+//    dependency.dstSubpass = 0;
+//    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+//    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+//
+//    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+//
+//    VkRenderPassCreateInfo renderPassInfo{};
+//    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+//    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+//    renderPassInfo.pAttachments = attachments.data();
+//    renderPassInfo.subpassCount = 1;
+//    renderPassInfo.pSubpasses = &subpass;
+//    renderPassInfo.dependencyCount = 1;
+//    renderPassInfo.pDependencies = &dependency;
+//
+//    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &imguiRenderPass) != VK_SUCCESS) {
+//        LOG_CRITICAL("failed to create ImGui render pass");
+//    }
+//}
+
+void pipeline::createFinalRenderPass()
+{
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = _swapchain->swapChainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = findDepthFormat();
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+
+    // lighting subpass
+    VkAttachmentReference colorAttachmentRefLighting{};
+    colorAttachmentRefLighting.attachment = 0;
+    colorAttachmentRefLighting.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRefLighting{};
+    depthAttachmentRefLighting.attachment = 1;
+    depthAttachmentRefLighting.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription lightingSubpass{};
+    lightingSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    lightingSubpass.colorAttachmentCount = 1;
+    lightingSubpass.pColorAttachments = &colorAttachmentRefLighting;
+    lightingSubpass.pDepthStencilAttachment = &depthAttachmentRefLighting;
+
+    // wireframe subpass
+    VkAttachmentReference colorAttachmentRefWireframe{};
+    colorAttachmentRefWireframe.attachment = 0;
+    colorAttachmentRefWireframe.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRefWireframe{};
+    depthAttachmentRefWireframe.attachment = 1;
+    depthAttachmentRefWireframe.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription wireframeSubpass{};
+    wireframeSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    wireframeSubpass.colorAttachmentCount = 1;
+    wireframeSubpass.pColorAttachments = &colorAttachmentRefWireframe;
+    wireframeSubpass.pDepthStencilAttachment = &depthAttachmentRefWireframe;
+
+    // imgui subpass
+    VkAttachmentReference colorAttachmentRefImGui{};
+    colorAttachmentRefImGui.attachment = 0;
+    colorAttachmentRefImGui.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRefImGui{};
+    depthAttachmentRefImGui.attachment = 1;
+    depthAttachmentRefImGui.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription imguiSubpass{};
+    imguiSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    imguiSubpass.colorAttachmentCount = 1;
+    imguiSubpass.pColorAttachments = &colorAttachmentRefImGui;
+    imguiSubpass.pDepthStencilAttachment = &depthAttachmentRefImGui;
+
+    std::array<VkSubpassDescription, 3> subpasses = { lightingSubpass, wireframeSubpass, imguiSubpass };
+
+    std::array<VkSubpassDependency, 3> dependencies{};
+
+    // external -> lighting
+    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[0].dstSubpass = 0;
+    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    // lighting -> wireframe
+    dependencies[1].srcSubpass = 0;
+    dependencies[1].dstSubpass = 1;
+    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    // wireframe -> imgui
+    dependencies[2].srcSubpass = 1;
+    dependencies[2].dstSubpass = 2;
+    dependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[2].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    dependencies[2].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassInfo.pAttachments = attachments.data();
+    renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
+    renderPassInfo.pSubpasses = subpasses.data();
+    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    renderPassInfo.pDependencies = dependencies.data();
+
+    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &finalRenderPass) != VK_SUCCESS) {
+        LOG_CRITICAL("failed to create final render pass");
+    }
+}
 
 void pipeline::createGBufferPipeline() {
     utils::shader myShader(device, "shaders/g_buffer.vert.spv", "shaders/g_buffer.frag.spv");
@@ -1088,18 +1254,6 @@ void pipeline::createGBufferPipeline() {
     vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
     vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-    VkPipelineRenderingCreateInfoKHR pipelineRenderingInfo{};
-    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-
-    std::array<VkFormat, 3> colorAttachmentFormats = {
-        VK_FORMAT_R8G8B8A8_UNORM,       // Albedo
-        VK_FORMAT_R16G16B16A16_SFLOAT,  // Normal
-        VK_FORMAT_R16G16B16A16_SFLOAT   // Emissive
-    };
-    pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size());
-    pipelineRenderingInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
-    pipelineRenderingInfo.depthAttachmentFormat = findDepthFormat();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -1177,7 +1331,6 @@ void pipeline::createGBufferPipeline() {
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineInfo.pStages = shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -1190,7 +1343,7 @@ void pipeline::createGBufferPipeline() {
     pipelineInfo.pDynamicState = &dynamicState;
 
     pipelineInfo.layout = gBufferPipelineLayout;
-    pipelineInfo.renderPass = VK_NULL_HANDLE;
+    pipelineInfo.renderPass = gBufferRenderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
@@ -1219,14 +1372,6 @@ void pipeline::createLightingPipeline()
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
-
-    VkPipelineRenderingCreateInfoKHR pipelineRenderingInfo{};
-    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-
-    VkFormat colorAttachmentFormat = _swapchain->swapChainImageFormat;
-    pipelineRenderingInfo.colorAttachmentCount = 1;
-    pipelineRenderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
-    pipelineRenderingInfo.depthAttachmentFormat = findDepthFormat();
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -1289,7 +1434,6 @@ void pipeline::createLightingPipeline()
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineInfo.pStages = shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -1302,7 +1446,7 @@ void pipeline::createLightingPipeline()
     pipelineInfo.pDynamicState = &dynamicState;
 
     pipelineInfo.layout = lightingPipelineLayout;
-    pipelineInfo.renderPass = VK_NULL_HANDLE;
+    pipelineInfo.renderPass = finalRenderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
@@ -1333,14 +1477,6 @@ void pipeline::createWireframePipeline()
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
-
-    VkPipelineRenderingCreateInfoKHR pipelineRenderingInfo{};
-    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-
-    VkFormat colorAttachmentFormat = _swapchain->swapChainImageFormat;
-    pipelineRenderingInfo.colorAttachmentCount = 1;
-    pipelineRenderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
-    pipelineRenderingInfo.depthAttachmentFormat = findDepthFormat();
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -1409,7 +1545,6 @@ void pipeline::createWireframePipeline()
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineInfo.pStages = shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -1420,7 +1555,7 @@ void pipeline::createWireframePipeline()
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = wireframePipelineLayout;
-    pipelineInfo.renderPass = VK_NULL_HANDLE;
+    pipelineInfo.renderPass = finalRenderPass;
     pipelineInfo.subpass = 1;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDepthStencilState = &depthStencil;
@@ -1506,50 +1641,65 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     // gBuffer pass
     {
-        std::array<VkRenderingAttachmentInfoKHR, 3> colorAttachments{};
-        VkClearValue clearColor = { { { 0.0f, 0.0f, 0.0f, 0.0f } } };
+        std::array<VkClearValue, 4> clearValues{};
 
-        colorAttachments[0] = { VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, gBuffer.albedoView, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, clearColor };
-        colorAttachments[1] = { VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, gBuffer.normalView, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, clearColor };
-        colorAttachments[2] = { VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, gBuffer.emissiveView, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, clearColor };
+        clearValues[0].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // Albedo + Metallic
+        clearValues[1].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // Normal + Roughness
+        clearValues[2].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // Emissive + AO
+        clearValues[3].depthStencil = { 1.0f, 0 };
 
-        VkRenderingAttachmentInfoKHR depthAttachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, gBufferDepthImageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, { {1.0f, 0} } };
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = gBufferRenderPass;
+        renderPassInfo.framebuffer = gBufferFramebuffer;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = _swapchain->swapChainExtent;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
-        VkRenderingInfoKHR renderingInfo{};
-        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-        renderingInfo.renderArea = { {0, 0}, _swapchain->swapChainExtent };
-        renderingInfo.layerCount = 1;
-        renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
-        renderingInfo.pColorAttachments = colorAttachments.data();
-        renderingInfo.pDepthAttachment = &depthAttachment;
-
-        vkCmdBeginRendering(commandBuffer, &renderingInfo);
-
-        VkViewport viewport{ 0.0f, 0.0f, static_cast<float>(renderData.viewportWidth), static_cast<float>(renderData.viewportHeight), 0.0f, 1.0f };
-        VkRect2D scissor{ {0, 0}, {renderData.viewportWidth, renderData.viewportHeight} };
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gBufferPipeline);
 
-        VkBuffer vertexBufferHandle = _vertexBuffer->getVertexBuffer();
-        VkDeviceSize vertexOffsets[] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBufferHandle, vertexOffsets);
-        vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(renderData.viewportWidth);
+        viewport.height = static_cast<float>(renderData.viewportHeight);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = { renderData.viewportWidth, renderData.viewportHeight };
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        VkBuffer vertexBuffer = _vertexBuffer->getVertexBuffer();
+        VkDeviceSize vertexOffsets[] = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, vertexOffsets);
+
+        VkBuffer indexBuffer = _indexBuffer->getIndexBuffer();
+        VkDeviceSize indexOffsetBase = 0;
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, indexOffsetBase, VK_INDEX_TYPE_UINT32);
+
+        // global ubo binding
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gBufferPipelineLayout, 0, 1, &renderData.globalDescriptorSet, 0, nullptr);
 
         for (const auto& item : renderObjects) {
             if (!item.mesh || !item.material) continue;
+
             vkCmdPushConstants(commandBuffer, gBufferPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &item.modelMatrix);
+
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, gBufferPipelineLayout, 1, 1, &item.material->descriptorSet, 0, nullptr);
+
             vkCmdDrawIndexed(commandBuffer, item.mesh->indexCount, 1, item.mesh->indexOffset, static_cast<int32_t>(item.mesh->vertexOffset), 0);
         }
 
-        vkCmdEndRendering(commandBuffer);
+        vkCmdEndRenderPass(commandBuffer);
     }
 
-    // sync barrier (gBuffer -> lighting)
+    // sync barrier
     {
         std::array<VkImageMemoryBarrier, 4> imageBarriers{};
 
@@ -1610,78 +1760,78 @@ void pipeline::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     // final pass
     {
-        VkClearValue colorClearValue = { {{renderData.clearColor.x, renderData.clearColor.y, renderData.clearColor.z, renderData.clearColor.w}} };
-        VkClearValue depthClearValue = { {1.0f, 0} };
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = { {renderData.clearColor.x, renderData.clearColor.y, renderData.clearColor.z, renderData.clearColor.w} };
+        clearValues[1].depthStencil = { 1.0f, 0 };
 
-        VkRenderingAttachmentInfoKHR colorAttachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, _swapchain->getImageView(imageIndex), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, colorClearValue };
-        VkRenderingAttachmentInfoKHR depthAttachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, nullptr, swapchainDepthImageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_NONE, nullptr, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, depthClearValue };
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = finalRenderPass;
+        renderPassInfo.framebuffer = _swapchain->getSwapchainFramebuffer(imageIndex);
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = _swapchain->swapChainExtent;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
-        VkRenderingInfoKHR renderingInfo{};
-        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-        renderingInfo.renderArea = { {0, 0}, _swapchain->swapChainExtent };
-        renderingInfo.layerCount = 1;
-        renderingInfo.colorAttachmentCount = 1;
-        renderingInfo.pColorAttachments = &colorAttachment;
-        renderingInfo.pDepthAttachment = &depthAttachment;
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkViewport viewport{ 0.0f, 0.0f, static_cast<float>(renderData.viewportWidth), static_cast<float>(renderData.viewportHeight), 0.0f, 1.0f };
-        VkRect2D scissor{ {0, 0}, {renderData.viewportWidth, renderData.viewportHeight} };
+        // lighting subpass (0)
 
-        // lighting pass
-        vkCmdBeginRendering(commandBuffer, &renderingInfo);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipeline);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipelineLayout, 0, 1, &renderData.globalDescriptorSet, 0, nullptr);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipelineLayout, 1, 1, &gBufferDescriptorSet, 0, nullptr);
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-        vkCmdEndRendering(commandBuffer);
 
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-
-        // wireframe pass
-        vkCmdBeginRendering(commandBuffer, &renderingInfo);
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(renderData.viewportWidth);
+        viewport.height = static_cast<float>(renderData.viewportHeight);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = { renderData.viewportWidth, renderData.viewportHeight };
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        // global ubo (set 0)
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipelineLayout, 0, 1, &renderData.globalDescriptorSet, 0, nullptr);
+
+        // gBuffer textures (set 1)
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lightingPipelineLayout, 1, 1, &gBufferDescriptorSet, 0, nullptr);
+
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+        // wireframe pass (1)
+        vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipeline);
         vkCmdSetLineWidth(commandBuffer, 2.0f);
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
         if (wireframeVertexCount > 0 && wireframeIndexCount > 0) {
-            VkBuffer wireframeBuffers[] = { wireframeVertexBuffer };
+            VkBuffer vertexBuffers[] = { wireframeVertexBuffer };
             VkDeviceSize offsets[] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, wireframeBuffers, offsets);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
             vkCmdBindIndexBuffer(commandBuffer, wireframeIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
             glm::mat4 mvp = renderData.projMatrix * renderData.viewMatrix;
             vkCmdPushConstants(commandBuffer, wireframePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &mvp);
+
             vkCmdDrawIndexed(commandBuffer, wireframeIndexCount, 1, 0, 0, 0);
         }
-        vkCmdEndRendering(commandBuffer);
 
-        // imgui pass
-        vkCmdBeginRendering(commandBuffer, &renderingInfo);
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-        vkCmdEndRendering(commandBuffer);
+        // imgui pass (2)
+        vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+        ImDrawData* draw_data = ImGui::GetDrawData();
+        if (draw_data && draw_data->TotalVtxCount > 0) {
+            ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
+        }
+
+        vkCmdEndRenderPass(commandBuffer);
     }
-
-    VkImageMemoryBarrier presentBarrier{};
-    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    presentBarrier.dstAccessMask = 0;
-    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.image = _swapchain->getImage(imageIndex);
-    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    presentBarrier.subresourceRange.baseMipLevel = 0;
-    presentBarrier.subresourceRange.levelCount = 1;
-    presentBarrier.subresourceRange.baseArrayLayer = 0;
-    presentBarrier.subresourceRange.layerCount = 1;
-
-    vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &presentBarrier);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         LOG_CRITICAL("Failed to record command buffer");

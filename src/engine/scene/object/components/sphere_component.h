@@ -3,7 +3,6 @@
 
 #include "collider_component.h"
 
-#include "rigidbody_component.h"
 #include <logs.h>
 
 class SphereComponent : public ColliderComponent {
