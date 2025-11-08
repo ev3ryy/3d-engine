@@ -2,28 +2,25 @@
 #define RENDERER_FABRIC_H
 
 #include <irenderer.h>
+#include <shaders/shader_manager.h>
 
-#include <vulkan/pipeline.h>
-
-enum API_TYPE {
-	Vulkan = 0,
-	DX12 = 1,
-	OpenGL = 2,
-};
+#include <vulkan/vulkan_pipeline.h>
 
 namespace RendererFabric {
-	IRenderer* createPipeline(API_TYPE api_type) {
+	IPipeline* createPipeline(API_TYPE api_type, ShaderManager* shaderManager) {
 		switch (api_type)
 		{
 		case Vulkan:
-			return new pipeline();
+			return new VulkanPipeline(shaderManager);
 		case DX12:
 			break;
 		case OpenGL:
 			break;
 		default:
-			break; nullptr;
+			break; return nullptr;
 		}
+
+		return nullptr;
 	}
 }
 

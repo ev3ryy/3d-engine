@@ -1,5 +1,5 @@
-#ifndef RENDERER_PIPELINE_H
-#define RENDERER_PIPELINE_H
+#ifndef VULKAN_PIPELINE_H
+#define VULKAN_PIPELINE_H
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -30,6 +30,9 @@
 // main renderer interface
 #include <irenderer.h>
 
+#include <shaders/i_shader.h>
+#include <shaders/shader_manager.h>
+
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 struct DebugLineVertex;
@@ -38,10 +41,12 @@ struct PushConstantData {
     glm::mat4 model;
 };
 
-class pipeline : public IRenderer {
+class VulkanPipeline : public IPipeline {
 public:
-    pipeline() = default;
-	~pipeline() = default;
+    VulkanPipeline(ShaderManager* manager) : shaderManager(manager) {}
+	~VulkanPipeline() = default;
+
+    bool IsValid() override;
 
     // initializing
     void init() override;
@@ -52,10 +57,18 @@ public:
     void drawFrame(RenderFrameData& frameData) override;
     FrameRenderStatus endFrame() override;
 
+    // shader
+    IShader* createShader(const ShaderBlobSet& blobs) override;
+
     // window
     void notifyWindowResized() override;
 
-    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj, glm::vec3 cameraPos);
+    // imgui
+    void imguiInitialize() override;
+
+    void uploadMesh(Mesh* mesh) override;
+
+    void updateUniformBuffer(uint32_t currentImage, const glm::mat4& view, const glm::mat4& proj, glm::vec3 cameraPos, glm::vec3 sunDirection, float sunIntesnity);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, const RenderFrameData& renderData, const std::vector<RenderObject>& renderObjects);
 
     MaterialInstance* getOrCreateMaterialInstance(Material& material);
@@ -68,12 +81,8 @@ public:
     VkQueue                         getGraphicsQueue() const { return graphicsQueue; }
     VkQueue                         getPresentQueue() const { return presentQueue; }
     uint32_t                        getQueueFamily() const { return queueFamily; }
-    //VkRenderPass                    getLightingRenderPass() const { return lightingRenderPass; }
-    //VkRenderPass                    getImGuiRenderPass() const { return imguiRenderPass; }
     VkRenderPass                    getFinalRenderPass() const { return finalRenderPass; }
     VkDescriptorPool                getDescriptorPool() const { return descriptorPool; }
-    uint32_t                        getMinImageCount() const { return _swapchain->minImageCount; }
-    uint32_t                        getImageCount() const { return _swapchain->imageCount; }
     uint32_t                        getCurrentFrame() const { return currentFrame; }
     VkImageView                     getSwapchainDepthImageView() const { return swapchainDepthImageView; };
     std::vector<VkDescriptorSet>    getDescriptorSets() const { return descriptorSets; }
@@ -153,7 +162,7 @@ private:
 
     VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VulkanDevice* device;
+    VulkanDevice* device = nullptr;
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     VkQueue presentQueue = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -195,9 +204,16 @@ private:
 
     size_t currentInstanceCapacity = 100;
 
+    std::vector<VkSemaphore> waitSemaphoresForImage;
+    std::vector<VkFence> imagesInFlight;
+
     const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        "VK_KHR_shader_non_semantic_info"
     };
+
+    ShaderManager* shaderManager;
+    std::unique_ptr<IShader> gBufferShader;
 
     buffers::vertexBuffer* _vertexBuffer;
     buffers::indexBuffer* _indexBuffer;
@@ -308,4 +324,4 @@ private:
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkCommandBuffer commandBuffer);
 };
 
-#endif // RENDERER_VULKAN_H
+#endif // VULKAN_PIPELINE_H

@@ -2,8 +2,8 @@
 #define I_RENDERER_H
 
 #include <material/material.h>
-
 #include <renderer_data.h>
+#include <shaders/i_shader.h>
 
 class IInstance {
 public:
@@ -18,9 +18,9 @@ public:
 	virtual bool IsValid() = 0;
 };
 
-class IRenderer {
+class IPipeline {
 public:
-	virtual ~IRenderer() {};
+	virtual ~IPipeline() {};
 
 	virtual bool IsValid() = 0;
 
@@ -36,10 +36,17 @@ public:
 	// window
 	virtual void notifyWindowResized() = 0;
 
+	// imgui
+	virtual void imguiInitialize() = 0;
+
 	// etc
+	virtual void uploadMesh(Mesh* mesh) = 0;
+
 	virtual MaterialInstance* getOrCreateMaterialInstance(Material& material) = 0;
 
-	virtual IInstance* getInstance() = 0;
+	virtual IShader* createShader(const ShaderBlobSet& blobs) = 0;
+
+	//virtual IInstance* getInstance() = 0;
 	virtual IDevice* getDevice() = 0;
 };
 

@@ -39,7 +39,7 @@ namespace ui {
 			abort();
 	}
 
-	void debug::initialize(renderer& _renderer) {
+	/*void debug::initialize(renderer& _renderer) {
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -64,7 +64,7 @@ namespace ui {
 		initInfo.Allocator = nullptr;
 		initInfo.CheckVkResultFn = check_vk_result;
 		ImGui_ImplVulkan_Init(&initInfo);
-	}
+	}*/
 
     static void drawObjectNode(Object* object, Object*& selectedObject) {
         const auto& children = object->getChildren();
@@ -389,14 +389,7 @@ namespace ui {
                         if (auto* mrc = obj->getComponent<MeshRendererComponent>()) {
                             auto mesh = mrc->getMesh();
                             if (mesh && mesh->vertexCount == 0) {
-                                auto pipeline = renderer.getPipeline();
-                                size_t vertexByteOffset = pipeline->getVertexBuffer()->appendVertices(mesh->getVertices());
-                                size_t indexByteOffset = pipeline->getIndexBuffer()->appendIndices(mesh->getIndices());
-
-                                mesh->vertexOffset = static_cast<uint32_t>(vertexByteOffset / sizeof(vertex));
-                                mesh->indexOffset = static_cast<uint32_t>(indexByteOffset / sizeof(uint32_t));
-                                mesh->vertexCount = static_cast<uint32_t>(mesh->getVertices().size());
-                                mesh->indexCount = static_cast<uint32_t>(mesh->getIndices().size());
+                                renderer.uploadMesh(mesh.get());
                             }
                         }
                     }
@@ -409,19 +402,18 @@ namespace ui {
 		ImGui::End();
 	}
 
-    void drawLightingControls(pipeline& pipelineInstance) {
+    void drawLightingControls(World& world) {
         ImGui::Begin("Lighting Settings");
-
         ImGui::Text("Sun Light");
 
-        glm::vec3 currentSunLightDirection = pipelineInstance.sunDirection;
+        glm::vec3 currentSunLightDirection = world.getSunDirection();
         if (ImGui::SliderFloat3("Direction", &currentSunLightDirection.x, -1.0f, 1.0f)) {
-            pipelineInstance.sunDirection = currentSunLightDirection;
+            world.setSunDirection(currentSunLightDirection);
         }
 
-        float currentSunLightIntensity = pipelineInstance.sunIntesnity;
+        float currentSunLightIntensity = world.getSunIntensity();
         if (ImGui::SliderFloat("Intensity", &currentSunLightIntensity, 0.0f, 200.0f)) {
-            pipelineInstance.sunIntesnity = currentSunLightIntensity;
+            world.setSunIntensity(currentSunLightIntensity);
         }
 
         ImGui::End();
@@ -432,6 +424,6 @@ namespace ui {
         Object* selectedObject = drawSceneHierarchy(world, renderer);
         drawInspector(selectedObject);
         drawAssetBrowser(world, renderer);
-        drawLightingControls(*renderer.getPipeline());
+        drawLightingControls(world);
     }
 }

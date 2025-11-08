@@ -15,6 +15,7 @@
 /out/
 /bin/
 /lib/
+/cache/
 /cmake-build-*/
 
 *.log

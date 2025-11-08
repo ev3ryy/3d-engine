@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include <irenderer.h>
+#include <shaders/shader_manager.h>
 
 class window;
 class World;
@@ -29,12 +30,16 @@ public:
 	void collectRenderableObjectsRecursive(Object* currentObject, std::vector<RenderObject>& renderObjects, ResourceManager& resourceManager, float interpolationAlpha);
 	void syncWithWorld(const World& world, ResourceManager& resourceManager, float interpolationAlpha);
 
-	//IRenderer* getPipeline() const { return pipeline; }
+	void uploadMesh(Mesh* mesh);
+
+	IPipeline* getPipeline() const { return pipeline; }
 
 private:
 	window* _window;
-	IRenderer* pipeline = nullptr;
+	IPipeline* pipeline = nullptr;
 	std::vector<RenderObject> _renderObjects;
+
+	std::unique_ptr<ShaderManager> shaderManager;
 };
 
 #endif // RENDERER_RENDERER_H

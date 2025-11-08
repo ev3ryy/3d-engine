@@ -50,6 +50,9 @@ struct RenderFrameData {
     uint32_t viewportWidth;
     uint32_t viewportHeight;
 
+    glm::vec3 sunDirection;
+    float sunIntensity;
+
     ImVec4 clearColor;
     ImDrawData* imguiDrawData = nullptr;
 };
@@ -58,6 +61,12 @@ enum class FrameRenderStatus {
     Success,
     Error,
     SwapChainNeedsResize
+};
+
+enum API_TYPE {
+    Vulkan = 0,
+    DX12 = 1,
+    OpenGL = 2,
 };
 
 #endif // RENDERER_DATA_H

@@ -24,10 +24,10 @@ UniformBuffer::UniformBuffer(VmaAllocator allocator, VkDeviceSize size)
 
 UniformBuffer::~UniformBuffer()
 {
-	if (mappedMemory) {
-		vmaUnmapMemory(_allocator, allocation);
-		mappedMemory = nullptr;
-	}
+	//if (mappedMemory) {
+	//	vmaUnmapMemory(_allocator, allocation);
+	//	mappedMemory = nullptr;
+	//}
 	if (buffer != VK_NULL_HANDLE && allocation != nullptr) {
 		vmaDestroyBuffer(_allocator, buffer, allocation);
 		buffer = VK_NULL_HANDLE;

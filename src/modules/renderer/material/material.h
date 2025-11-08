@@ -49,6 +49,9 @@ public:
 
 class MaterialInstance {
 public:
+    MaterialInstance() : material(nullptr) {}
+    ~MaterialInstance() { material = nullptr;  }
+
     Material* material;
     std::unique_ptr<UniformBuffer> buffer;
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;

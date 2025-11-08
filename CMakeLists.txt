@@ -15,12 +15,27 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/bullet3 EXCLUDE_FROM_ALL)
 
 find_package(Vulkan REQUIRED)
-# find_package(Bullet CONFIG REQUIRED)
+
+find_program(DXC_EXECUTABLE dxc)
+
+if(NOT DXC_EXECUTABLE)
+    set(DXC_EXECUTABLE "${CMAKE_SOURCE_DIR}/shaders/dxc/dxc.exe")
+    
+    if(NOT EXISTS ${DXC_EXECUTABLE})
+        message(FATAL_ERROR "Dxc compiler not found! Please install via VCPKG or place dxc.exe in ${CMAKE_SOURCE_DIR}/shaders/dxc/")
+    endif()
+endif()
+
+set(SHADERS_DIR "${CMAKE_SOURCE_DIR}/shaders")
+set(SHADERS_CACHE_DIR "${SHADERS_DIR}/cache")
+
+file(MAKE_DIRECTORY ${SHADERS_CACHE_DIR})
 
 add_subdirectory(src/modules/core)
 add_subdirectory(src/modules/renderer)
 add_subdirectory(src/modules/input)
 add_subdirectory(src/modules/logger)
+add_subdirectory(shaders)
 
 file(GLOB IMGUI_SOURCES
     "${CMAKE_SOURCE_DIR}/include/imgui/*.cpp"

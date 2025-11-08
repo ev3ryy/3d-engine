@@ -43,17 +43,20 @@ public:
 
     std::vector<VkFramebuffer> getSwapchainFramebuffer() const { return swapChainFramebuffers; }
 
+    uint32_t getImageCount() const { return imageCount; }
+    uint32_t getMinImageCount() const { return minImageCount; }
+
     VkSwapchainKHR swapChain;
     std::vector<VkImage> swapChainImages;
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
 
-    uint32_t minImageCount = 2;
-    uint32_t imageCount;
-
 private:
     std::vector<VkFramebuffer> swapChainFramebuffers;
+
+    uint32_t minImageCount = 2;
+    uint32_t imageCount;
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;

@@ -24,7 +24,6 @@
 
 renderer::renderer()
 {
-	init();
 }
 
 renderer::~renderer()
@@ -33,7 +32,9 @@ renderer::~renderer()
 }
 
 void renderer::init() {
-	pipeline = RendererFabric::createPipeline(API_TYPE::Vulkan);
+	shaderManager = std::make_unique<ShaderManager>();
+
+	pipeline = RendererFabric::createPipeline(API_TYPE::Vulkan, shaderManager.get());
 
 	_window = new window(1920, 1080, "Engine");
 
@@ -115,6 +116,12 @@ void renderer::syncWithWorld(const World& world, ResourceManager& resourceManage
 	}
 }
 
+void renderer::uploadMesh(Mesh* mesh) {
+	if (pipeline) {
+		pipeline->uploadMesh(mesh);
+	}
+}
+
 void renderer::render(const World& world, ResourceManager& resourceManager, float alpha, PhysicsWorld* physicsWorld)
 {
 	if (!pipeline || !pipeline->IsValid() || !pipeline->getDevice()->IsValid()) {
@@ -151,6 +158,9 @@ void renderer::render(const World& world, ResourceManager& resourceManager, floa
 	frameData.cameraNearPlane = activeCamera.getNearPlane();
 	frameData.cameraFarPlane = activeCamera.getFarPlane();
 	frameData.cameraPosition = activeCamera.position;
+
+	frameData.sunDirection = world.getSunDirection();
+	frameData.sunIntensity = world.getSunIntensity();
 
 	frameData.imguiDrawData = ImGui::GetDrawData();
 	frameData.clearColor = ImVec4(0.23f, 0.22f, 0.22f, 1.00f);

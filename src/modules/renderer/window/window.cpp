@@ -1,6 +1,6 @@
 #include "window.h"
 
-#include <vulkan/pipeline.h>
+#include <vulkan/vulkan_pipeline.h>
 
 #include <GLFW/glfw3.h>
 #include <logs.h>
