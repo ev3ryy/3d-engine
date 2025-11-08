@@ -11,8 +11,8 @@ class World;
 class ResourceManager;
 struct GLFWwindow;
 
-typedef void(*RawGameUpdateCallback)(float deltaTime, World& world, ResourceManager& resourceManager, IInputProvider* inputProvider);
-typedef RawGameUpdateCallback(*GetGameUpdateFuncPtr)();
+//typedef void(*RawGameUpdateCallback)(float deltaTime, World& world, ResourceManager& resourceManager, IInputProvider* inputProvider);
+//typedef RawGameUpdateCallback(*GetGameUpdateFuncPtr)();
 
 class GameApplication {
 public:
@@ -31,7 +31,7 @@ private:
     GLFWwindow* m_mainWindowHandle = nullptr;
 
     void* m_gameDllHandle = nullptr;
-    RawGameUpdateCallback m_gameUpdateFunc = nullptr;
+    //RawGameUpdateCallback m_gameUpdateFunc = nullptr;
 
     bool loadGameDll(const char* dllPath);
 

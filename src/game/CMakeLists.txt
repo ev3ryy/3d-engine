@@ -25,7 +25,11 @@ target_link_libraries(Game PUBLIC
 
 target_compile_definitions(Game PRIVATE GAME_EXPORTS)
 
-target_compile_options(Game PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(Game PRIVATE /utf-8)
+else()
+    target_compile_options(Game PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 install(TARGETS Game
     DESTINATION ${CMAKE_INSTALL_LIBDIR}

@@ -2,7 +2,7 @@
 #include "../object.h"
 #include "transform_component.h"
 #include "collider_component.h"
-#include "../../physics/world/physics_world.h"
+#include "physics/world/physics_world.h"
 
 void RigidBodyComponent::addedToObject() {
     isDirty = true;

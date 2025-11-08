@@ -36,12 +36,16 @@ target_link_libraries(EngineRuntime PUBLIC
     glfw
     Vulkan::Vulkan
     assimp
+    LinearMath
     BulletCollision
     BulletDynamics
-    LinearMath
     Bullet3Common
 )
 
-target_compile_options(EngineRuntime PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(EngineRuntime PRIVATE /utf-8)
+else()
+    target_compile_options(EngineRuntime PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 target_compile_definitions(EngineRuntime PUBLIC ENGINE_BUILD)

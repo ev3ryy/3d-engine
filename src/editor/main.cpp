@@ -70,12 +70,10 @@ int main() {
         LOG_ERROR("failed to load Game.dll.");
     }
 
-    auto editorUpdateCallback = [&](float deltaTime, World& world, renderer& rendererInstance, ResourceManager& resourceManager) {
+    auto editorUpdateCallback = [&](World& world, renderer& rendererInstance) {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        PerformanceStats stats = window::updatePerfomanceStats();
 
         ui::debug::drawDebugMenu(world, rendererInstance);
 

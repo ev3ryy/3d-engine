@@ -12,7 +12,11 @@ add_library(renderer ${RENDERER_SOURCES})
 
 add_dependencies(renderer CompileShaders)
 
-target_compile_options(renderer PUBLIC /utf-8)
+if (MSVC)
+    target_compile_options(renderer PUBLIC /utf-8)
+else()
+    target_compile_options(renderer PUBLIC -Wall -Wextra -Wpedantic)
+endif()
 
 target_include_directories(renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

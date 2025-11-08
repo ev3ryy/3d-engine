@@ -28,7 +28,7 @@ public:
     Engine(core* coreInstance, renderer* rendererInstance);
     ~Engine();
 
-    bool run(std::function<void(float deltaTime, World&, renderer&, ResourceManager&)> editorUpdateCallback,
+    bool run(std::function<void(World&, renderer&)> editorUpdateCallback,
         std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
         GLFWwindow* windowHandle);
 
@@ -38,7 +38,6 @@ public:
     EngineState getCurrentState() const { return currentState; }
     void setState(EngineState newState) {
         if (currentState != newState) {
-            EngineState oldState = currentState;
             currentState = newState;
             onStateChanged(newState);
         }

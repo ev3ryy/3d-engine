@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <renderer.h>
-
 #include <logs.h>
 
 #ifdef _WIN32
@@ -105,24 +104,29 @@ void ResourceManager::RegisterMaterial(const std::string& id, std::shared_ptr<Ma
     }
 }
 
-void ResourceManager::LoadAndRegisterScriptFactories(void* dllHandle)
+void ResourceManager::LoadAndRegisterScriptFactories(void* moduleHandle)
 {
-    if (!dllHandle) {
-        LOG_ERROR("ResourceManager: Попытка зарегистрировать скрипты из невалидного хэндла DLL.");
+    if (!moduleHandle) {
+        LOG_ERROR("ResourceManager: Module handle is null, cannot load script factories.");
         return;
     }
 
-    GetScriptRegistryFunc getRegistry = (GetScriptRegistryFunc)GET_FUNC((HMODULE)dllHandle, "GetScriptRegistry");
-    if (!getRegistry) {
-        LOG_ERROR("ResourceManager: Не удалось найти функцию 'GetScriptRegistry' в предоставленной DLL.");
+#ifdef _WIN32
+    auto getRegistryFunc = (GetScriptRegistryFunc)GET_FUNC((HMODULE)moduleHandle, "GetScriptRegistry");
+#else
+    auto getRegistryFunc = (GetScriptRegistryFunc)GET_FUNC(moduleHandle, "GetScriptRegistry");
+#endif
+
+    if (!getRegistryFunc) {
+        LOG_ERROR("ResourceManager: Failed to get 'GetScriptRegistry' function from module.");
         return;
     }
 
-    const auto& registry = getRegistry();
+    const auto& registry = getRegistryFunc();
     for (const auto& info : registry) {
         if (m_ScriptFactories.find(info.scriptName) == m_ScriptFactories.end()) {
             m_ScriptFactories[info.scriptName] = info.createFunc;
-            LOG_INFO("ResourceManager: Зарегистрирована фабрика для скрипта '%s'.", info.scriptName.c_str());
+            LOG_INFO("ResourceManager: Registered script factory for '%s'.", info.scriptName.c_str());
         }
     }
 }
@@ -134,7 +138,7 @@ std::unique_ptr<IScriptInstance> ResourceManager::CreateScriptInstance(const std
         return it->second();
     }
 
-    LOG_ERROR("ResourceManager: Не удалось найти фабрику для создания скрипта с именем '%s'.", name.c_str());
+    LOG_ERROR("ResourceManager: No script factory found for script '%s'.", name.c_str());
     return nullptr;
 }
 

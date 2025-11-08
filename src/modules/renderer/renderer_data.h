@@ -26,8 +26,8 @@ struct RenderFrameData {
         const std::vector<DebugLineVertex>& inPhysicsVertices,
         const std::vector<uint32_t>& inPhysicsIndices
     ) :
-        renderObjects(inRenderObjects),
         physicsDebugVertices(inPhysicsVertices),
+        renderObjects(inRenderObjects),
         physicsDebugIndices(inPhysicsIndices)
     {
     }

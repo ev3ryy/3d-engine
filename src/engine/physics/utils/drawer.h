@@ -19,7 +19,7 @@ public:
     virtual void setDebugMode(int debugMode) override;
     virtual int getDebugMode() const override;
 
-    void clearLines();
+    void clearLines() override;
     const std::vector<DebugLineVertex>& getVertices() const { return m_vertices; }
     const std::vector<uint32_t>& getIndices() const { return m_indices; }
 

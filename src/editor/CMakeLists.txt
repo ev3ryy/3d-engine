@@ -30,7 +30,7 @@ target_include_directories(Editor PUBLIC
 
 target_link_libraries(Editor PRIVATE
     EngineRuntime
-    EngineImgui
+    EngineImGui
     Game
     core
     logger
@@ -43,4 +43,8 @@ target_link_libraries(Editor PRIVATE
 
 target_compile_definitions(Editor PRIVATE ENGINE_EDITOR)
 
-target_compile_options(Editor PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(Editor PRIVATE /utf-8)
+else()
+    target_compile_options(Editor PRIVATE -Wall -Wextra -Wpedantic)
+endif()

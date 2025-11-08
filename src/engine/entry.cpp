@@ -68,7 +68,7 @@ void Engine::onStateChanged(EngineState newState)
     }
 }
 
-bool Engine::run(std::function<void(float deltaTime, World&, renderer&, ResourceManager&)> editorUpdateCallback,
+bool Engine::run(std::function<void(World&, renderer&)> editorUpdateCallback,
     std::function<void(float deltaTime, World&, ResourceManager&, IInputProvider* inputProvider)> gameUpdateCallback,
     GLFWwindow* windowHandle)
 {
@@ -165,7 +165,7 @@ bool Engine::run(std::function<void(float deltaTime, World&, renderer&, Resource
         }
 
         if (editorUpdateCallback) {
-            editorUpdateCallback(deltaTime, *world.get(), *_renderer, ResourceManager::Get());
+            editorUpdateCallback(*world.get(), *_renderer);
         }
 
         _renderer->render(*world.get(), ResourceManager::Get(), alpha, physicsWorld.get());

@@ -70,7 +70,7 @@ void PhysicsWorld::debugDrawAllEnabledColliders(const std::vector<Object*>& allO
 
     drawer->clearLines();
 
-    int debugMode = m_DynamicsWorld->getDebugDrawer()->getDebugMode();
+    //int debugMode = m_DynamicsWorld->getDebugDrawer()->getDebugMode();
 
     for (Object* obj : allObjects) {
         if (RigidBodyComponent* rb = obj->getComponent<RigidBodyComponent>()) {

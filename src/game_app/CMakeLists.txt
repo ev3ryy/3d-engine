@@ -39,4 +39,8 @@ target_link_libraries(GameApp PRIVATE
     optimized Game
 )
 
-target_compile_options(GameApp PRIVATE /utf-8)
+if(MSVC)
+    target_compile_options(GameApp PRIVATE /utf-8)
+else()
+    target_compile_options(GameApp PRIVATE -Wall -Wextra -Wpedantic)
+endif()

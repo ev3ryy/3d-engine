@@ -13,10 +13,6 @@ struct ShaderKey {
 
     uint32_t flags;
 
-    std::string toFilename() const {
-        // e.g., "g_buffer_vert_vk_" + std::to_string(flags) + ".spv"
-    }
-
     std::string toCacheKey() const {
         std::stringstream ss;
         ss << baseName << "_"

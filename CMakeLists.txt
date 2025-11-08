@@ -5,6 +5,19 @@ if (DEFINED ENV{VCPKG_ROOT})
 endif()
 project(MyEngine CXX)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
+foreach(OUTPUTCONFIG IN LISTS CMAKE_CONFIGURATION_TYPES)
+    string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG_UPPER)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER} "${CMAKE_BINARY_DIR}/bin")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER} "${CMAKE_BINARY_DIR}/lib")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER} "${CMAKE_BINARY_DIR}/lib")
+endforeach()
+
+set(CMAKE_DEBUG_POSTFIX "" CACHE STRING "No debug postfix" FORCE)
+
 message(STATUS "VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,11 +31,12 @@ if(WIN32)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /RTC1 /MDd")
     
     set(DXC_EXECUTABLE "${CMAKE_SOURCE_DIR}/shaders/compiler/win/dxc.exe")
-
 else()
     set(UNIX_COMMON_FLAGS "-Wall -Wextra -pedantic -fPIC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${UNIX_COMMON_FLAGS}" CACHE STRING "Flags for GCC/Clang")
     
+    add_compile_options(-Wno-nullability-extension)
+
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
     
@@ -38,8 +52,19 @@ if(NOT EXISTS ${DXC_EXECUTABLE})
     message(FATAL_ERROR "Dxc compiler not found! Please ensure the executable for the current platform is placed at ${DXC_EXECUTABLE}")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+add_compile_options(-Wno-error)
+add_compile_options(-Wno-reorder-ctor)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/glfw)
+
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/assimp)
+set_target_properties(assimp PROPERTIES COMPILE_FLAGS "-Wno-error -Wno-character-conversion")
 add_subdirectory(${CMAKE_SOURCE_DIR}/include/bullet3 EXCLUDE_FROM_ALL)
 
 find_package(Vulkan REQUIRED)
@@ -60,11 +85,15 @@ file(GLOB IMGUI_SOURCES
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan/*.cpp"
 )
 
-add_library(EngineImgui STATIC ${IMGUI_SOURCES})
+add_library(EngineImGui STATIC ${IMGUI_SOURCES})
 
-target_compile_options(EngineImgui PUBLIC /utf-8)
+if (MSVC)
+    target_compile_options(EngineImGui PUBLIC /utf-8)
+else()
+    target_compile_options(EngineImGui PUBLIC -Wall -Wextra -Wpedantic)
+endif()
 
-target_include_directories(EngineImgui PUBLIC
+target_include_directories(EngineImGui PUBLIC
     "${CMAKE_SOURCE_DIR}/include/imgui"
     "${CMAKE_SOURCE_DIR}/include/imgui/vulkan"
     "${CMAKE_SOURCE_DIR}/include/glfw/include"

@@ -1759,10 +1759,14 @@ void VulkanPipeline::createWireframePipeline()
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    VkVertexInputBindingDescription bindingDescription = DebugLineVertex::getBindingDescription();
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &DebugLineVertex::getBindingDescription();
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(DebugLineVertex::getAttributeDescriptions().size());
-    vertexInputInfo.pVertexAttributeDescriptions = DebugLineVertex::getAttributeDescriptions().data();
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+
+    auto attributeDescriptions = DebugLineVertex::getAttributeDescriptions();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -2264,7 +2268,7 @@ void VulkanPipeline::createSingleDefaultTexture(
 
     VmaAllocationCreateInfo imageAllocInfo{};
     imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    if (vmaCreateImage(allocator, &imageInfo, &imageAllocInfo, &image, &imageAllocation, nullptr) != VK_SUCCESS) { // <-- Используем переданный imageAllocation
+    if (vmaCreateImage(allocator, &imageInfo, &imageAllocInfo, &image, &imageAllocation, nullptr) != VK_SUCCESS) { // <-- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ imageAllocation
         LOG_CRITICAL("Failed to create default image!");
         vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
         return;

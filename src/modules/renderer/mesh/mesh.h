@@ -110,7 +110,7 @@ class Mesh {
 public:
     Mesh() = default;
     Mesh(const std::vector<vertex>& vertices, const std::vector<uint32_t>& indices)
-        : vertices_(vertices), indices_(indices), indexCount(static_cast<uint32_t>(indices.size()))
+        : vertices_(vertices), indexCount(static_cast<uint32_t>(indices.size())), indices_(indices)
     {
 
     }
