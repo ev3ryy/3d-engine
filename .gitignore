@@ -1,3 +1,13 @@
+!/shaders/compiler/win/dxc.exe
+!/shaders/compiler/win/dxcompiler.dll
+!/shaders/compiler/win/dxil.dll
+!/shaders/compiler/win/dxv.exe
+
+!/shaders/compiler/linux/dxc
+!/shaders/compiler/linux/libdxcompiler.so
+!/shaders/compiler/linux/libdxil.so
+!/shaders/compiler/linux/dxv
+
 *.o
 *.obj
 *.so
@@ -10,6 +20,9 @@
 *.pdb
 *.ilk
 *.exp
+
+*.dxil
+*.spv
 
 /build/
 /out/
