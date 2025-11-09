@@ -36,9 +36,9 @@ target_link_libraries(EngineRuntime PUBLIC
     glfw
     Vulkan::Vulkan
     assimp
-    LinearMath
-    BulletCollision
     BulletDynamics
+    BulletCollision
+    LinearMath
     Bullet3Common
 )
 

@@ -34,9 +34,7 @@ target_link_libraries(GameApp PRIVATE
     glfw
     Vulkan::Vulkan
     assimp
-
-    debug Gamed
-    optimized Game
+    Game
 )
 
 if(MSVC)

@@ -109,6 +109,6 @@ target_include_directories(EngineImGui PUBLIC
 add_subdirectory(src/engine)
 add_subdirectory(src/game)
 add_subdirectory(src/editor)
-add_subdirectory(src/game_app)
+#add_subdirectory(src/game_app)
 
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Editor)
